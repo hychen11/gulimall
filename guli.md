@@ -187,6 +187,12 @@ docker update docker_redis --restart=always
 
 https://gitee.com/renrenio
 
+renren-fast is backend adminstration system
+
+renren-generator 
+
+renren-fast-vue
+
 use jdk 17 and change lomlock version to `<lombok.version>1.18.30</lombok.version>`
 
 ```shell
@@ -202,6 +208,10 @@ frontend use nvm manage node version!
 (base) ➜  ~ node --version
 v14.21.3
 ```
+
+renren-fast里有db有mysql.sql创建admin的database
+
+修改resource里的application.yml
 
 # generator
 
