@@ -152,8 +152,6 @@ docker update docker_mysql --restart=always
 docker update docker_redis --restart=always
 ```
 
-
-
 两个必要组键
 
 * **Spring Web**
@@ -169,6 +167,18 @@ docker update docker_redis --restart=always
         <module>gulimall-product</module>
         <module>gulimall-ware</module>
     </modules>
+```
+
+`.gitignore`
+
+```
+**/mvnw
+**/mvnw.cmd
+
+**/.mvn
+**/target/
+
+.idea
 ```
 
 
