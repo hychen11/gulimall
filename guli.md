@@ -231,14 +231,14 @@ spring:
     type: com.alibaba.druid.pool.DruidDataSource
     #MySQL配置
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3307/gulimall_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=America/Chicago
+   	url: jdbc:mysql://localhost:3307/gulimall_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=America/Chicago
     username: root
-    password: "root"
+    password: "0602"
 ```
 
 `geenrator.properties`
 
-```
+```properties
 #\u4EE3\u7801\u751F\u6210\u5668\uFF0C\u914D\u7F6E\u4FE1\u606F
 
 mainPath=com.hychen11
@@ -253,17 +253,35 @@ email=zjuchy1@gmail.com
 tablePrefix=pms_
 ```
 
+Copy main into dir
+
+template controller delete `RequiresPermissions`
+
 # gulimall-common
+
+because generator has many DAO,DTO,entity  error, so need to create a class, that contains these class
+
+so add pom.xml (product)
+
+```xml
+ <dependency>
+      <groupId>com.hychen11</groupId>
+      <artifactId>common</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+  </dependency>
+```
+
+
 
 ```java
 /**
  * 1、整合MyBatis-Plus
  *      1）、导入依赖
- *      <dependency>
- *             <groupId>com.baomidou</groupId>
- *             <artifactId>mybatis-plus-boot-starter</artifactId>
- *             <version>3.3.1</version>
- *      </dependency>
+ *     <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>3.5.10.1</version>
+        </dependency>
  *      2）、配置
  *          1、配置数据源；
  *              1）、导入数据库的驱动。https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-versions.html
@@ -321,6 +339,13 @@ step1 导入依赖
 			<artifactId>lombok</artifactId>
 			<version>1.18.8</version>
 		</dependency>
+ 
+    <dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpcore</artifactId>
+			<version>4.4.16</version>
+			<scope>compile</scope>
+		</dependency>
 ```
 
 step2.1 配置数据源
@@ -342,7 +367,7 @@ step2.1 配置数据源
 		</dependency>
 ```
 
-在application.yml里配置数据源
+在application.yml里配置数据源，表述数据操作到哪个表里
 
 ```yml
 spring:
@@ -376,6 +401,8 @@ mybatis-plus:
     db-config:
       id-type: auto
 ```
+
+entity上有`@TableId`表示这个是主键，`auto`表示自增主键 
 
 mysql的索引是b+树结构，如果用uuid b+树结构会不停变化很消耗资源，一般都是自增
 
