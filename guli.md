@@ -181,13 +181,11 @@ docker update docker_redis --restart=always
 .idea
 ```
 
-
-
 # renren opensource(Backend and Frontend)
 
 https://gitee.com/renrenio
 
-renren-fast is backend adminstration system
+renren-fast is backend adminstration system (this is based on springboot 2.6.6, and not 3.X.X, so need old version java 17)
 
 renren-generator 
 
@@ -209,9 +207,17 @@ frontend use nvm manage node version!
 v14.21.3
 ```
 
-renren-fast里有db有mysql.sql创建admin的database
+use the mysql.sql script in renren-fast/db to build admin database
 
-修改resource里的application.yml
+then modify resource/application_dev.yml for jdbc connection
+
+## renren fast
+
+nvm install 14!
+
+ `npm install node-sass@npm:sass --ignore-scripts`
+
+`npm run dev`
 
 # generator
 
