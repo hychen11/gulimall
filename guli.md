@@ -215,9 +215,10 @@ then modify resource/application_dev.yml for jdbc connection
 
 nvm install 14!
 
- `npm install node-sass@npm:sass --ignore-scripts`
-
-`npm run dev`
+```
+npm install node-sass@npm:sass --ignore-scripts
+npm run dev
+```
 
 # generator
 
@@ -443,7 +444,7 @@ SpringCloud Ribbon (load balance)
 
 SpringCloud Feign: RPC
 
-SpringCloud Alibaba Sentinel (Fault Tolerance, Rate Limiting or Throttling, Graceful Degradation or Fallback, Circuit Breaker) 服务容错限流降级融断
+**SpringCloud Alibaba Sentinel** (Fault Tolerance, Rate Limiting or Throttling, Graceful Degradation or Fallback, Circuit Breaker) 服务容错限流降级融断
 
 SpringCloud gateway API gateway webflux
 
@@ -477,6 +478,19 @@ download nacos https://github.com/alibaba/nacos/releases
 
 https://github.com/alibaba/spring-cloud-alibaba/blob/2023.x/spring-cloud-alibaba-examples/nacos-example/readme.md
 
+#### docker Nacos
+
+```shell
+(base) ➜  ~ docker run --name nacos -d -p 8848:8848 \                  
+--restart=always \
+-e JVM_XMS=512m \
+-e JVM_XMX=2048m \
+-e MODE=standalone \
+-e PREFER_HOST_MODE=hostname \
+-v ~/nacos-logs:/home/nacos/logs \    
+nacos/nacos-server:latest
+```
+
 **服务注册发现**也放gulimall-common pom.xml里
 
 Before launching the Nacos Discovery sample for demonstration, take a look at how Spring Cloud applications access Nacos Discovery.
@@ -485,7 +499,7 @@ Before launching the Nacos Discovery sample for demonstration, take a look at ho
 
 1. First, modify the `pom.xml` file and introduce spring-cloud-alibaba-nacos-discovery-starter;
 
-   ```
+   ```xml
    <dependency>
        <groupId>com.alibaba.cloud</groupId>
        <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
@@ -877,29 +891,33 @@ HelloService helloService = (HelloService) context.getBean("helloService");
 String result = helloService.sayHello("Dubbo");
 ```
 
-# 三级API 2.9
+# 三级API 2.11
 
 
 
-# 品牌管理 2.10
+# 品牌管理 2.12
 
-# API属性分类+平台属性 2.11
+# API属性分类+平台属性 2.13
 
-# 新增商品 2.12
+# 新增商品 2.14
 
-# 仓库管理 2.13
+# 仓库管理 2.15
 
-# ES 2.14
+# ES 2.16
 
-# 商品上架 2.15
+# 商品上架 2.17
 
-# 性能压测 2.16
+# 性能压测 2.18
 
-# 缓存 2.17
+# 缓存 2.19
 
-# 检索服务 2.18
+# 检索服务 2.20
 
-# 异步 2.19
+# 异步 2.21
 
-# 商品详情 2.20
+# 商品详情 2.22
+
+review and buffer -2.28
+
+
 
