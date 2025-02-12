@@ -8,7 +8,7 @@
 
 package com.hychen11.common.xss;
 
-import io.renren.common.exception.RRException;
+import com.hychen11.common.utils.RRException;
 import org.apache.commons.lang.StringUtils;
 
 /**

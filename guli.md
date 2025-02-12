@@ -481,7 +481,7 @@ https://github.com/alibaba/spring-cloud-alibaba/blob/2023.x/spring-cloud-alibaba
 #### docker Nacos
 
 ```shell
-(base) ➜  ~ docker run --name nacos -d -p 8848:8848 \                  
+(base) ➜  ~ docker run --name nacos -d -p 8849:8848 \                  
 --restart=always \
 -e JVM_XMS=512m \
 -e JVM_XMX=2048m \
@@ -489,7 +489,11 @@ https://github.com/alibaba/spring-cloud-alibaba/blob/2023.x/spring-cloud-alibaba
 -e PREFER_HOST_MODE=hostname \
 -v ~/nacos-logs:/home/nacos/logs \    
 nacos/nacos-server:latest
+
+(base) ➜  ~ docker update nacos --restart=always
 ```
+
+
 
 **服务注册发现**也放gulimall-common pom.xml里
 
@@ -506,19 +510,25 @@ Before launching the Nacos Discovery sample for demonstration, take a look at ho
    </dependency>
    ```
 
-   
-
 2. Configuring a Nacos Server address in an `/src/main/resources/application.properties` applied configuration file;
 
-   ```
+   ```properties
    spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
-   ```
-
+   #注意这里nacos 2.5要带上username, password, default is nacos/nacos
    
+     cloud:
+       nacos:
+         discovery:
+           server-addr: localhost:8849
+           username: nacos
+           password: "nacos"
+     application:
+       name: product
+   ```
 
 3. Use `@ EnableDiscoveryClient` annotation to enable service registration and discovery;
 
-   ```
+   ```java
    @SpringBootApplication
    @EnableDiscoveryClient
    public class ProviderApplication {

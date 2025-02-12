@@ -4,6 +4,15 @@ spring:
     url: jdbc:mysql://localhost:3307/gulimall_sms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=America/Chicago
     username: root
     password: "0602"
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8849
+        username: nacos
+        password: "nacos"
+  application:
+    name: coupon
+
 #  cloud:
 #    nacos:
 #      serverAddr: 127.0.0.1:8848
@@ -17,9 +26,6 @@ spring:
 #  config:
 #    import:
 #      - nacos:gulimall-coupon.properties?refreshEnabled=true&group=DEFAULT_GROUP
-
-  application:
-    name: coupon
 
 mybatis-plus:
   mapper-locations: classpath:/mapper/**/*.xml
