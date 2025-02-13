@@ -684,8 +684,15 @@ public interface CouponFeignService {
 > Step2 B的feign package里有AFeignService interface，里面函数就是直接copy A的funcA，然后还要在头上加上`@FeignClient(A)` 为了去nacos找到service A的machine地址然后通过http发送请求得到回复，然后这里的`RequestMapping` 要包含完整路径
 >
 > Step3 注入AFeignService，调用函数
-
-
+>
+> ```
+> Service B 调用 AFeignService.funcA()
+> → Feign 代理 HTTP 请求
+> → Nacos 获取 Service A 地址
+> → 发送 HTTP 请求到 Service A
+> → Service A 处理并返回数据
+> → Feign 解析 JSON，返回 Java 对象
+> ```
 
 ### Nacos config
 
@@ -777,6 +784,10 @@ in application.yml add  `namespace: 6b8fe1af-0411-4ca5-a000-eef67eafc137` and ` 
 
 # Gateway
 
+nginx is one kind of gateway
+
+> Nginx 本质上是一个**高性能的 HTTP 服务器和反向代理**，而 API Gateway 是一种专门针对**微服务架构**的网关解决方案
+
 Client -> **API-service(gateway)**->{user-service,good-service,...}
 
 Zuui RPS(20000), SpringCloud gateway RPS(30000)
@@ -800,13 +811,13 @@ uri身份证号 url地址定位+身份证
 
 ### Glossary
 
-- **Route**: The basic building block of the gateway. It is defined by an ID, a destination URI, a collection of predicates, and a collection of filters. A route is matched if the aggregate predicate is true.
+- **Route**: The basic building block of the gateway. It is defined by an ID, a destination URI, a collection of predicates, and a collection of filters. **A route is matched if the aggregate predicate is true.**
 
 - **Predicate**: This is a [Java 8 Function Predicate](https://docs.oracle.com/javase/8/docs/api/java/util/function/Predicate.html). The input type is a [Spring Framework `ServerWebExchange`](https://docs.spring.io/spring/docs/5.0.x/javadoc-api/org/springframework/web/server/ServerWebExchange.html). This lets you match on anything from the HTTP request, such as headers or parameters.
 
   > whether Routing and Forwarding needs condition judge (Predicate)
 
-- **Filter**: These are instances of [`GatewayFilter`](https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server/src/main/java/org/springframework/cloud/gateway/filter/GatewayFilter.java) that have been constructed with a specific factory. Here, you can modify requests and responses before or after sending the downstream request.
+- **Filter**: These are instances of [`GatewayFilter`](https://github.com/spring-cloud/spring-cloud-gateway/blob/main/spring-cloud-gateway-server/src/main/java/org/springframework/cloud/gateway/filter/GatewayFilter.java) that have been constructed with a specific factory. Here, you can modify **requests and responses** before or after sending the downstream request.
 
   > filter 
 
@@ -826,25 +837,31 @@ https://docs.spring.io/spring-cloud-gateway/reference/spring-cloud-gateway/reque
 
 step1）开启服务注册发现`@EnableDiscoveryClient`
 
-`bootstrap.properties`
+因为引入了common，里面有mybatis的操作，需要有数据源，但是这里用不到，就直接排除
+
+`@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})`
+
+**`bootstrap.properties`**最早加载，初始化springcloud组件
 
 ```properties
-spring.application.name = gulimall-gateway
-spring.cloud.nacos.config.server-addr = 127.0.0.1:8848
-spring.cloud.nacos.discovery.namespace = d970e33c-b3fa-451c-afb2-e715e8279e67
+spring.application.name = gateway
+spring.cloud.nacos.config.server-addr = 127.0.0.1:8849
+spring.cloud.nacos.discovery.namespace = 41e93e2f-de27-4db9-80b9-8ae0fc7e3634
 ```
 
-`application.properties`
+`application.properties` 后加载读取
 
 ```yml
-spring.application.name=gulimall-gateway
-spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
+spring.application.name=gateway
+spring.cloud.nacos.discovery.server-addr=127.0.0.1:8849
 server.port= 12000
 ```
 
 Netty started on port 12000
 
-Query注意这里要 `http://localhost:12000/?url=google` 这里？才是query！才能被perdicate
+Query注意这里要 `http://localhost:12000/?url=google` 这里`?`才是query！才能被perdicate
+
+`？`前的是查询的地址，比如`http://localhost:12000/hello?url=google`就是查询`https://www.google.com/hello`
 
 ```yml
 spring:
@@ -860,8 +877,6 @@ spring:
           predicates:
             - Query=url,baidu
 ```
-
-
 
 # Dubbo
 
@@ -907,6 +922,10 @@ String result = helloService.sayHello("Dubbo");
 ```
 
 # 三级API 2.12
+
+```sql
+
+```
 
 
 
