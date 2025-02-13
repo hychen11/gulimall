@@ -514,6 +514,7 @@ Before launching the Nacos Discovery sample for demonstration, take a look at ho
 
    ```properties
    spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
+   spring.application.name: gulimall-XXX
    #注意这里nacos 2.5要带上username, password, default is nacos/nacos
    
      cloud:
@@ -586,15 +587,7 @@ systemctl enable nacos
 systemctl is-enabled nacos
 ```
 
-然后别忘了配置application.yml
-
-```yml
-spring.application.name: gulimall-XXX
-```
-
-简单说就是加依赖，加注解，加application.yml
-
-`@EnableDiscoveryClient`
+简单说就是**加依赖**，**加注解`@EnableDiscoveryClient`**，**加application.yml**
 
 > 用于在 Spring Cloud 项目中启用服务注册和发现功能。它的主要作用是使应用程序能够注册到服务注册中心（比如 Eureka、Consul 或 Zookeeper），从而实现微服务的自动发现和负载均衡等功能。
 >
@@ -602,17 +595,21 @@ spring.application.name: gulimall-XXX
 
 ### Feign
 
+> **Process: service A want call service B, then visit nacos find B on machine1,2,3, return one machine to service A, then it can call**
+
 Feign is Declarative HTTP Client
 
-Feign 允许开发者定义接口，并通过注解方式指定接口方法要请求的 HTTP 路径、参数等。Feign 会根据接口和注解自动生成对应的 HTTP 请求逻辑，并通过注册中心（比如 Eureka）查找服务地址，简化了服务调用。
+Feign 允许开发者定义接口，并通过注解方式指定接口方法要请求的 HTTP 路径、参数等。Feign 会根据接口和注解自动生成对应的 HTTP 请求逻辑，并通过注册中心查找服务地址，简化了服务调用。
 
 **声明式接口**：你只需定义一个 Java 接口，并用注解来描述 HTTP 请求的细节，比如 `@GetMapping`、`@PostMapping` 等。
 
 **自动代理**：Feign 会在运行时创建接口的代理，实现远程调用。通过代理对象，Feign 会自动生成 HTTP 请求，发送到目标服务，并将返回结果映射为 Java 对象。
 
-**负载均衡**：结合 Eureka 和 Ribbon（已内置在 Spring Cloud Feign 中），Feign 支持客户端负载均衡，可以自动选择一个可用的实例来发送请求。
+**负载均衡**：结合 Eureka 和 **Ribbon**（已内置在 Spring Cloud Feign 中），Feign 支持客户端负载均衡，可以自动选择一个可用的实例来发送请求。
 
 有一个 `UserService`，另一个服务 `OrderService` 想调用它的 `/user/info` 接口。可以这样定义 Feign 客户端接口：
+
+`**@FeignClient(name = "coupon", url ="http://localhost:7000")**`如果未指定 url，会根据 name 在 Eureka/Nacos 等注册中心寻找 coupon 服务
 
 ```java
 import org.springframework.cloud.openfeign.FeignClient;
@@ -633,15 +630,13 @@ public interface UserClient {
 
 ```java
 /*
-    1）引入openfeign
+    1）include openfeign
     2）interface, tell springcloud this interface needs rpc
     3) open rpc (@EnableFeignClients)
 */
 ```
 
-1）
-
-在创建module里就勾了springweb+openfeign
+1） 在创建module里就勾了springweb+openfeign
 
 ```xml
        <dependency>
@@ -654,7 +649,7 @@ public interface UserClient {
         </dependency>
 ```
 
-2）创建一个feign的package，创建CouponFeignService的Interface
+2）创建一个feign的package，创建 的Interface
 
 ```java
 package com.hychen11.gulimall.member.feign;
@@ -663,7 +658,7 @@ import com.hychen11.gulimall.common.utils.R;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
-@FeignClient(name="gulimall-coupon",url = "http://localhost:7000")
+@FeignClient(name="coupon",url = "http://localhost:7000")
 public interface CouponFeignService {
     @GetMapping("/coupon/coupon/member/list")
     public R memberCoupons();
@@ -672,7 +667,7 @@ public interface CouponFeignService {
 
 注意，这里的R class相当与把数据Map成JSON格式，然后返回给客户端
 
-如果调用接口的`memberCoupons()`,去注册中心找`gulimall-coupon`，然后调用请求`/coupon/coupon/member/list`
+如果调用接口的`memberCoupons()`,去注册中心找`coupon`，然后调用请求`/coupon/coupon/member/list`
 
 3）Main Application Class add @EnableFeignClients
 
@@ -681,6 +676,16 @@ public interface CouponFeignService {
 ```
 
 启动时会自动扫描这个路径下的所有标了`@FeignClient` annotation的 Interface
+
+> 回顾一下feign的调用流程，假设service A，service B, A 有funcA，B想调用A的funcA
+>
+> Step1 B创建feign package，然后在Application加上`@EnableFeignClients(basePackages="")`在启动时可以读取到feign包的内容
+>
+> Step2 B的feign package里有AFeignService interface，里面函数就是直接copy A的funcA，然后还要在头上加上`@FeignClient(A)` 为了去nacos找到service A的machine地址然后通过http发送请求得到回复，然后这里的`RequestMapping` 要包含完整路径
+>
+> Step3 注入AFeignService，调用函数
+
+
 
 ### Nacos config
 
@@ -901,31 +906,31 @@ HelloService helloService = (HelloService) context.getBean("helloService");
 String result = helloService.sayHello("Dubbo");
 ```
 
-# 三级API 2.11
+# 三级API 2.12
 
 
 
-# 品牌管理 2.12
+# 品牌管理 2.13
 
-# API属性分类+平台属性 2.13
+# API属性分类+平台属性 2.14
 
-# 新增商品 2.14
+# 新增商品 2.15
 
-# 仓库管理 2.15
+# 仓库管理 2.16
 
-# ES 2.16
+# ES 2.17
 
-# 商品上架 2.17
+# 商品上架 2.18
 
-# 性能压测 2.18
+# 性能压测 2.19
 
-# 缓存 2.19
+# 缓存 2.20
 
-# 检索服务 2.20
+# 检索服务 2.21
 
-# 异步 2.21
+# 异步 2.22
 
-# 商品详情 2.22
+# 商品详情 2.23
 
 review and buffer -2.28
 
