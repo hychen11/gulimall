@@ -1,6 +1,7 @@
 package com.hychen11.product.controller;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,12 +33,12 @@ public class CategoryController {
 
     /**
      * 列表
+     *  get all categoryService and the tree
      */
-    @RequestMapping("/list")
-    public R list(@RequestParam Map<String, Object> params){
-        PageUtils page = categoryService.queryPage(params);
-
-        return R.ok().put("page", page);
+    @RequestMapping("/list/tree")
+    public R list(){
+        List<CategoryEntity> list=categoryService.listWithTree();
+        return R.ok().put("listWithTree",list);
     }
 
 

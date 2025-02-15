@@ -921,35 +921,87 @@ HelloService helloService = (HelloService) context.getBean("helloService");
 String result = helloService.sayHello("Dubbo");
 ```
 
-# 三级API 2.12
+# 三级API 2.14
 
-```sql
+`protected`
 
+**同一个类（自身）**
+
+**同一个包（package）内的所有类**
+
+**不同包的子类（`extends`）**
+
+```java
+public class CategoryServiceImpl extends ServiceImpl<CategoryDao, CategoryEntity> implements CategoryService {}
+//这里Dao和Entity被封装在ServiceImpl的M和T里
+//或者直接@Autowire注入
+```
+
+## Stream & Filter & Collect
+
+stream可以处理数据集合
+
+`filter()` 是 **Stream** 的 **中间操作**，用于**筛选元素**，保留满足条件的元素，丢弃不符合条件的
+
+`filter()` 方法接受一个 **Lambda 表达式**，该表达式返回 `true` 表示保留元素，返回 `false` 表示丢弃
+
+`.collect(Collectors.toList())`：将流的结果收集为 `List`
+
+` .map(String::toUpperCase)` 
+
+```java
+List<CategoryEntity> collect = categoryEntities.stream().filter((entity) -> {
+    return entity.getParentCid() == 0;
+}).collect(Collectors.toList());
+```
+
+## Lambda
+
+```java
+(parameters) -> expression
+(parameters) -> { statements; } //(parameters) -> { return expression; }
+```
+
+parameters可为空
+
+## `@TableField`
+
+**映射 Java 类的字段到数据库表的列**，可以控制字段与数据库表的关系，例如：
+
+- 指定表字段名称
+- 处理数据库中不存在的字段
+- 处理数据库中的额外字段
+- 忽略某些字段
+
+```java
+	//在CategoryEntity里加入
+	@TableField(exist = false)
+	private List<CategoryEntity> child;
 ```
 
 
 
-# 品牌管理 2.13
+# 品牌管理 2.15
 
-# API属性分类+平台属性 2.14
+# API属性分类+平台属性 2.16
 
-# 新增商品 2.15
+# 新增商品 2.17
 
-# 仓库管理 2.16
+# 仓库管理 2.18
 
-# ES 2.17
+# ES 2.19
 
-# 商品上架 2.18
+# 商品上架 2.20
 
-# 性能压测 2.19
+# 性能压测 2.21
 
-# 缓存 2.20
+# 缓存 2.22
 
-# 检索服务 2.21
+# 检索服务 2.23
 
-# 异步 2.22
+# 异步 2.24
 
-# 商品详情 2.23
+# 商品详情 2.25
 
 review and buffer -2.28
 
