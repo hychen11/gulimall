@@ -979,29 +979,91 @@ parameters可为空
 	private List<CategoryEntity> child;
 ```
 
+## recursive search
 
+```java
+private List<CategoryEntity> getChild(CategoryEntity root, List<CategoryEntity> all) {
+    List<CategoryEntity> collect = all.stream()
+            .filter(entity -> entity.getParentCid() == root.getCatId())
+            .map(menu -> {menu.setChild(getChild(menu, all)); return menu;})
+            .collect(Collectors.toList());
+    return collect;
+}
+```
 
-# 品牌管理 2.15
+核心逻辑就是这里的root父级，child级，filter出所有patentid==catid的entities，然后再getChild，用map设置child
 
-# API属性分类+平台属性 2.16
+## config vue template
 
-# 新增商品 2.17
+添加一级菜单和二级菜单，我们设置的url `product/category`这里router显示规则是`product-category`
 
-# 仓库管理 2.18
+`views/modules/sys/`里有sys-role页面，那么就创建`views/modules/product/category.vue`
 
-# ES 2.19
+install plugins `Vetur` , vue template https://www.cnblogs.com/songjilong/p/12635448.html
 
-# 商品上架 2.20
+## 配置网关与路由重写
 
-# 性能压测 2.21
+visit `http://localhost:10000/product/category/list/tree`
 
-# 缓存 2.22
+前端修改`  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000';`
 
-# 检索服务 2.23
+发送到网关，renren-fast发送验证码，也要加入nacos
 
-# 异步 2.24
+gateway的application.yml里加入
 
-# 商品详情 2.25
+```yml
+- id: admin_route
+  uri: lb://renren-fast
+  ## lb is load balance
+  predicates:
+    ## 前端项目发送请求，带有/api前缀
+    - Path=/api/**
+  filters:
+  	- RewritePath=/api/(?<segment>.*),/renren-fast/$\{segment}
+  	## 将api前缀替换为renren-fast前缀
+```
+
+前端向网关发起请求，携带`/api`关键字，网关即可将请求通过负载均衡的方式转发给`renren-fast`
+
+`  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000/api';`
+
+因此发送`http://localhost:8080/api/1`可以得到``http://localhost:8080/renren-fast/1`
+
+## Cross-Origin Resource Sharing，CORS
+
+浏览器出于同源策略（Same-Origin Policy, SOP）的安全限制，阻止前端网页对不同源（不同域名、协议或端口）的资源进行访问
+
+当你的前端代码向不同源的服务器发送请求时，如果服务器没有正确配置 CORS，浏览器会**拦截**这个请求，从而导致跨域问题。
+
+**同源**指的是：
+
+- **协议**相同（http / https）
+- **域名**相同（example.com）
+- **端口**相同（80 / 443 / 8080 等）
+
+端口及以前都相同
+
+# 品牌管理 2.18
+
+# API属性分类+平台属性 2.19
+
+# 新增商品 2.20
+
+# 仓库管理 2.21
+
+# ES 2.22
+
+# 商品上架 2.23
+
+# 性能压测 2.24
+
+# 缓存 2.25
+
+# 检索服务 2.26
+
+# 异步 2.27
+
+# 商品详情 2.28
 
 review and buffer -2.28
 
