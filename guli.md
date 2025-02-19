@@ -1181,7 +1181,34 @@ export default {
 </style>
 ```
 
-getMenu就是发送请求得到response，然后把response.data里的listWithTree存到menus里，然后根据这里tree结构``child`
+getMenu就是发送请求得到response，然后把response.data里的listWithTree存到menus里，然后根据这里tree结构`child`
+
+### Delete
+
+`@RequestMapping` 默认支持**所有 HTTP 方法**，但如果没有显式指定 `method`，Spring 会接受所有类型的请求（`GET`、`POST`、`PUT`、`DELETE` 等）
+
+`@RequestBody` 是 **Spring MVC** 提供的一个注解，用于**将 HTTP 请求的 JSON 数据转换为 Java 对象**，主要用于 `POST`/`PUT` 请求，这里必须发送POST请求！！！！
+
+删除之前，需要检查当前删除的菜单，是否被别的地方引用
+
+- 物理删除：在数据库中将满足条件的数据删除，删除了数据就不存在了
+- 逻辑删除：在数据库中使用某一个字段作为标识类，表示是否被删除
+
+```yml
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: flag  # 全局逻辑删除的实体字段名(since 3.3.0,配置后可以忽略不配置步骤2)
+      logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+      logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
+```
+
+实体类字段加上`@TableLogic`逻辑删除注解，可以自定义
+
+```java
+@TableLogic(value = "1", delval = "0")
+private Integer showStatus;
+```
 
 
 
