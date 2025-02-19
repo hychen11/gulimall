@@ -1027,7 +1027,9 @@ gateway的application.yml里加入
 
 `  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000/api';`
 
-因此发送`http://localhost:8080/api/1`可以得到``http://localhost:8080/renren-fast/1`
+因此发送`http://localhost:8080/api/1`可以转发到`http://localhost:8080/renren-fast/1`
+
+这里gateway需要和renren-fast同一个name space，不然会有503的error问题
 
 ## Cross-Origin Resource Sharing，CORS
 
@@ -1041,7 +1043,34 @@ gateway的application.yml里加入
 - **域名**相同（example.com）
 - **端口**相同（80 / 443 / 8080 等）
 
-端口及以前都相同
+端口及以前都严格相同
+
+同源策略主要**限制**：
+
+1. **XHR（XMLHttpRequest）和 Fetch 请求**：禁止跨域请求数据。
+2. **DOM 访问**：不能操作不同源的 `iframe` 内的 DOM。
+3. **Cookie、localStorage、sessionStorage 访问**：不同源的页面不能访问彼此的存储数据
+
+### **跨域的请求方式**
+
+- `XMLHttpRequest` 或 `fetch`
+- `WebSocket`
+- `iframe`（嵌套不同源网页）
+- `JSONP`（只适用于 `GET` 请求）
+
+尚未进行配置之前，跨域预检`OPTIONS`都无法通过。
+
+非简单请求要先用`OPTIONS`，响应允许跨域就可以发送真实请求，server再响应数据
+
+#### 方法一
+
+直接让nginx代理跨域
+
+#### 方法  二
+
+`Access-Control-Allow-Origin: *` 但是不安全
+
+开发期间，在网关中加入一个`filters`过滤器，通过`配置当此请求允许跨域`的方法来解决跨域问题
 
 # 品牌管理 2.18
 

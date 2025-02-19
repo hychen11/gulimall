@@ -1,5 +1,8 @@
 spring:
   cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8849
     gateway:
       routes:
         - id: test_route
@@ -16,3 +19,5 @@ spring:
             - Path=/api/**
           filters:
             - RewritePath=/api/(?<segment>.*),/renren-fast/$\{segment}
+server:
+  port: 12000
