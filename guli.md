@@ -1051,7 +1051,7 @@ gateway的application.yml里加入
 2. **DOM 访问**：不能操作不同源的 `iframe` 内的 DOM。
 3. **Cookie、localStorage、sessionStorage 访问**：不同源的页面不能访问彼此的存储数据
 
-### **跨域的请求方式**
+### 跨域的请求方式
 
 - `XMLHttpRequest` 或 `fetch`
 - `WebSocket`
@@ -1066,11 +1066,124 @@ gateway的application.yml里加入
 
 直接让nginx代理跨域
 
-#### 方法  二
+#### 方法二
 
 `Access-Control-Allow-Origin: *` 但是不安全
 
 开发期间，在网关中加入一个`filters`过滤器，通过`配置当此请求允许跨域`的方法来解决跨域问题
+
+```java
+@Configuration
+public class MallCorsConfiguration {
+    @Bean
+    public CorsWebFilter corsWebFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        // 1. 配置跨域
+        // 1.1 设置允许跨域头部 —— *为所有
+        corsConfiguration.addAllowedHeader("*");
+        // 1.2 设置允许请求方式 —— *为所有种类请求
+        corsConfiguration.addAllowedMethod("*");
+        // 1.3 设置允许请求来源 —— *为任意请求来源
+//        corsConfiguration.addAllowedOrigin("*");
+        corsConfiguration.setAllowedOriginPatterns(List.of("*"));
+        // 1.4 是否允许携带cookie进行跨域
+        corsConfiguration.setAllowCredentials(true);
+        source.registerCorsConfiguration("/**", corsConfiguration);
+        return new CorsWebFilter(source);
+    }
+}
+```
+
+然后comment掉renren-fast里的corsconfig
+
+规定所有与商品服务有关请求都以**/api/product/**开头
+
+gateway规则正则表达式
+
+```yaml
+filters:
+  - RewritePath=/api/(?<segment>.*),/$\{segment}
+```
+
+`(?<segment>.*)` ：匹配 `/api/` 之后的所有字符，并将其**存入 `segment` 变量**。
+
+`$\{segment}` 代表前面正则捕获的内容（即 `/api/` 之后的部分）
+
+`$\{}` 形式是 **变量占位符**
+
+**高精度匹配路由放在前面，模糊匹配路由放在后面**
+
+```yaml
+  - id: product_route
+    uri: lb://product
+    predicates:
+      - Path=/api/product/**
+    filters:
+      - RewritePath=/api/(?<segment>.*),/$\{segment}
+```
+
+这个就是`/api/product/**`改写规则，转发到`product`
+
+这里`lb://product`是目标的地址，通过nacos找到的
+
+### 前端
+
+```vue
+<template>
+  <el-tree
+    :data="menus"
+    :props="defaultProps"
+    @node-click="handleNodeClick"
+  ></el-tree>
+</template>
+
+<script>
+export default {
+  components: {},
+  data () {
+    return {
+      menus: [],
+      defaultProps: {
+        children: 'child',
+        label: 'name'
+      }
+    }
+  },
+  methods: {
+    handleNodeClick (data) {
+      console.log(data)
+    },
+    getMenu () {
+      this.$http({
+        url: this.$http.adornUrl('/product/category/list/tree'),
+        method: 'get'
+      }).then((response) => {
+        this.menus = response.data.listWithTree
+      })
+    }
+  },
+  created () {
+    this.getMenu()
+  },
+  mounted () {},
+  beforeCreate () {},
+  beforeMount () {},
+  beforeUpdate () {},
+  updated () {},
+  beforeDestroy () {},
+  destroyed () {},
+  activated () {}
+}
+</script>
+
+<style scoped>
+</style>
+```
+
+getMenu就是发送请求得到response，然后把response.data里的listWithTree存到menus里，然后根据这里tree结构``child`
+
+
 
 # 品牌管理 2.18
 
