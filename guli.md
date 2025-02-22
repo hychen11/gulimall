@@ -1210,31 +1210,47 @@ mybatis-plus:
 private Integer showStatus;
 ```
 
+然后就是一堆前端的东西了
 
+```vue
+remove(node, data) {
+    // 1. 获取点击ID
+    var ids = [data.catId];
+    // 2. 发起POST请求，调用接口删除数据
+    this.$http({
+      url: this.$http.adornUrl("/product/category/delete"),
+      method: "post",
+      data: this.$http.adornData(ids, false),
+    }).then(({ data }) => {
+    // 3. 请求成功后，重新请求所有菜单并显示。
+    	this.getMenu();
+    });
+},
+```
 
-# 品牌管理 2.18
+然后后面append，edit啥的，全是前端的内容，这里就跳过了
 
-# API属性分类+平台属性 2.19
+# 品牌管理 2.22
 
-# 新增商品 2.20
+# API属性分类+平台属性 2.23
 
-# 仓库管理 2.21
+# 新增商品 2.24
 
-# ES 2.22
+# 仓库管理 2.25
 
-# 商品上架 2.23
+# ES 2.26
 
-# 性能压测 2.24
+# 商品上架 2.27
 
-# 缓存 2.25
+# 性能压测 2.28
 
-# 检索服务 2.26
+# 缓存 3.1
 
-# 异步 2.27
+# 检索服务 3.2
 
-# 商品详情 2.28
+# 异步 3.3
 
-review and buffer -2.28
+# 商品详情 3.4
 
 
 
