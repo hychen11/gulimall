@@ -1001,20 +1001,45 @@ private List<CategoryEntity> getChild(CategoryEntity root, List<CategoryEntity> 
 
 install plugins `Vetur` , vue template https://www.cnblogs.com/songjilong/p/12635448.html
 
-## 配置网关与路由重写
+## 配置网关与路由重写!!
 
-visit `http://localhost:10000/product/category/list/tree`
+```vue
+this.$http({
+  url: this.$http.adornUrl("/product/category/list/tree"),
+  method: "get",
+}).then((data)=>{});
+```
 
-前端修改`  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000';`
+这里需要访问 `http://localhost:10000/product/category/list/tree`
 
-发送到网关，renren-fast发送验证码，也要加入nacos
+也就是`index.js`里
+
+```js
+/**
+ * 开发环境
+ */
+;(function () {
+  window.SITE_CONFIG = {};
+
+  // api接口请求地址
+  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000/api';
+
+  // cdn地址 = 域名 + 版本号
+  window.SITE_CONFIG['domain']  = './'; // 域名
+  window.SITE_CONFIG['version'] = '';   // 版本号(年月日时分)
+  window.SITE_CONFIG['cdnUrl']  = window.SITE_CONFIG.domain + window.SITE_CONFIG.version;
+})();
+```
+
+发送到网关，renren-fast发送验证码，也要**加入nacos**
 
 gateway的application.yml里加入
 
 ```yml
 - id: admin_route
   uri: lb://renren-fast
-  ## lb is load balance
+  ## lb is load balance，使用loadbalance，并且把请求转发到renren-fast服务
+  ## lb:// 表示这是一个通过注册中心（如 Nacos、Eureka）进行服务发现的负载均衡调用
   predicates:
     ## 前端项目发送请求，带有/api前缀
     - Path=/api/**
@@ -1023,7 +1048,9 @@ gateway的application.yml里加入
   	## 将api前缀替换为renren-fast前缀
 ```
 
-前端向网关发起请求，携带`/api`关键字，网关即可将请求通过负载均衡的方式转发给`renren-fast`
+`uri: lb://renren-fast` 就是请求来了，先去nacos里找renren-fast到服务，发现servers后进行lb 负载均衡转发请求，
+
+断言规则（Predicates）：前端向网关发起请求，只有携带`/api`关键字才将请求通过负载均衡的方式转发给`renren-fast`
 
 `  window.SITE_CONFIG['baseUrl'] = 'http://localhost:12000/api';`
 
@@ -1031,11 +1058,29 @@ gateway的application.yml里加入
 
 这里gateway需要和renren-fast同一个name space，不然会有503的error问题
 
-## Cross-Origin Resource Sharing，CORS
+`filters` 解释一下正则匹配到规则：^匹配开头 $匹配结尾
+
+`.`：匹配任意一个字符（除了换行符）。
+
+`*`：匹配前一个字符 0 次或多次。
+
+所以 `.*` 表示：**匹配任意长度的任意字符（包括空字符串）**
+
+`(?<name>pattern)` 是 Java 正则表达式的语法，表示把匹配到的 `pattern` 保存到变量名 `name` 中，后续使用就直接`${name}` 这个是捕获的用法
+
+`(?<segment>.*)`就是匹配任意的放在segment里
+
+## Cross-Origin Resource Sharing，CORS 跨域问题
 
 浏览器出于同源策略（Same-Origin Policy, SOP）的安全限制，阻止前端网页对不同源（不同域名、协议或端口）的资源进行访问
 
 当你的前端代码向不同源的服务器发送请求时，如果服务器没有正确配置 CORS，浏览器会**拦截**这个请求，从而导致跨域问题。
+
+origin = `协议（scheme） + 域名（host） + 端口（port）`
+
+**简单跨域请求**（GET/POST 且无特殊 header）—— 浏览器自动发起请求，但如果响应头中没有 CORS 标志，**JS 无法读取响应内容**。
+
+**复杂跨域请求**（PUT/DELETE、自定义 header）—— 浏览器会先发一个 **预检请求（OPTIONS）** 来询问服务器是否允许跨域。
 
 **同源**指的是：
 
@@ -1065,6 +1110,30 @@ gateway的application.yml里加入
 #### 方法一
 
 直接让nginx代理跨域
+
+浏览器只会拦截“跨源请求”。如果前端静态资源（HTML/JS/CSS）和后端 API 都是从 **同一个域名+端口+协议** 请求的，那么就 **不算跨域**，浏览器不会阻止。
+
+让前端和后端都通过 Nginx 来服务
+
+```nginx
+server {
+    listen 80;
+    server_name mydomain.com;
+
+    # 前端资源的路由
+    location / {
+        root /usr/share/nginx/html/renren-fast-vue;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 后端 API 的路由
+    location /api/ {
+        proxy_pass http://localhost:8080/renren-fast/;
+        proxy_set_header Host $host;
+    }
+}
+```
 
 #### 方法二
 
@@ -1230,27 +1299,31 @@ remove(node, data) {
 
 然后后面append，edit啥的，全是前端的内容，这里就跳过了
 
-# 品牌管理 2.22
+# 品牌管理
 
-# API属性分类+平台属性 2.23
+OSS的内容先跳过了
 
-# 新增商品 2.24
 
-# 仓库管理 2.25
 
-# ES 2.26
+# API属性分类+平台属性 2.25
 
-# 商品上架 2.27
+# 新增商品 2.26
 
-# 性能压测 2.28
+# 仓库管理 2.27
 
-# 缓存 3.1
+# ES 2.28
 
-# 检索服务 3.2
+# 商品上架 
 
-# 异步 3.3
+# 性能压测
 
-# 商品详情 3.4
+# 缓存 
+
+# 检索服务 
+
+# 异步 
+
+# 商品详情 
 
 
 

@@ -77,8 +77,18 @@ public class CategoryController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] catIds){
+        //TODO use logic delete instead of physical delete
 		categoryService.removeMenuByIds(Arrays.asList(catIds));
 
+        return R.ok();
+    }
+
+    /**
+     * 排序
+     * */
+    @RequestMapping("/update/sort")
+    public R updateSort(@RequestParam CategoryEntity[] category){
+        categoryService.updateBatchById(Arrays.asList(category));
         return R.ok();
     }
 
