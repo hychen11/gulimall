@@ -5,8 +5,17 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.io.Serializable;
 import java.util.Date;
-import lombok.Data;
 
+import com.hychen11.common.valid.AddGroup;
+import com.hychen11.common.valid.UpdateGroup;
+import lombok.Data;
+import org.hibernate.validator.constraints.URL;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.Null;
+import javax.validation.constraints.Pattern;
+import com.hychen11.common.valid.ListValue;
 /**
  * 品牌
  * 
@@ -22,15 +31,20 @@ public class BrandEntity implements Serializable {
 	/**
 	 * 品牌id
 	 */
+	@NotBlank(message = "修改必须指定品牌id", groups = {UpdateGroup.class})
+	@Null(message = "新增不能指定品牌id", groups = {AddGroup.class})
 	@TableId
 	private Long brandId;
 	/**
 	 * 品牌名
 	 */
+	@NotBlank(message = "name cannot be empty",groups = {UpdateGroup.class,AddGroup.class})
 	private String name;
 	/**
 	 * 品牌logo地址
 	 */
+	@URL(message = "logo必须是一个合法的url地址")
+	@NotEmpty
 	private String logo;
 	/**
 	 * 介绍
@@ -39,10 +53,12 @@ public class BrandEntity implements Serializable {
 	/**
 	 * 显示状态[0-不显示；1-显示]
 	 */
+	@ListValue(values={0,1},groups = {AddGroup.class})
 	private Integer showStatus;
 	/**
 	 * 检索首字母
 	 */
+	@Pattern(regexp = "^[a-zA-Z]$", message = "one letter!")
 	private String firstLetter;
 	/**
 	 * 排序

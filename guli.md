@@ -1303,15 +1303,233 @@ remove(node, data) {
 
 OSS的内容先跳过了
 
+JRS303
+
+```java
+/**
+ * 保存
+ */
+@RequestMapping("/save")
+public R save(@Valid @RequestBody BrandEntity brand, BindingResult result) {
+    if (result.hasErrors()) {
+        Map<String, String> map = new HashMap<>();
+        // 1. 获取校验的错误结果
+        result.getFieldErrors().forEach(item -> {
+            // FieldError 获取错误提示
+            String defaultMessage = item.getDefaultMessage();
+            // 获取错误属性名称
+            String field = item.getField();
+            map.put(field, defaultMessage);
+        });
+        return R.error(400, "提交的数据不合法").put("data", map);
+    } else {
+        brandService.save(brand);
+        return R.ok();
+    }
+}
+```
+
+统一异常处理
+
+使用`@ControllerAdvice`注解标识
+
+使用`basePackages`标识哪个位置出现异常进行处理
+
+接口使用`BindingResult`会接收错误，感应异常。
+
+删除掉后就不再对异常进行处理，而是直接抛出异常。
+
+`GulimallExceptionControllerAdvice`的作用就是感应异常，集中处理。
+
+错误信息以`JSON`格式返回，需要给类添加`@ResponseBody`注解
+
+`@ResponseBody`注解和`@ControllerAdvice(basePackages`注解可以合并为`@RestControllerAdvice`注解
+
+```java
+@ResponseBody
+@ControllerAdvice(basePackages = "com/hychen11/product/controller")
+public class GulimallExceptionControllerAdvice {
+}
+```
+
+或者
+
+```java
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice(basePackages = "com/hychen11/product/controller")
+public class GulimallExceptionControllerAdvice {
+}
+```
+
+统一处理`MethodArgumentNotValidException`异常
+
+```java
+@Slf4j
+@RestControllerAdvice(basePackages = "com/hychen11/product/controller")
+public class GulimallExceptionControllerAdvice {
+    @ExceptionHandler(value = MethodArgumentNotValidException.class)
+    public R handleVaildException(MethodArgumentNotValidException e) {
+        log.error("数据校验出现问题:{},异常类型:{}", e.getMessage(), e.getClass());
+        BindingResult bindingResult = e.getBindingResult();
+        Map<String, String> errorMap = new HashMap<>();
+        bindingResult.getFieldErrors().forEach(fieldError -> {
+            errorMap.put(fieldError.getField(), fieldError.getDefaultMessage());
+        });
+        return R.error(400, "数据校验出现问题").put("data", errorMap);
+    }
+
+    // 无法准确匹配后处理
+    @ExceptionHandler(value = Throwable.class)
+    public R handleException(Throwable throwable) {
+        return R.error();
+    }
+}
+```
+
+全局状态码枚举类
+
+**错误码和错误信息定义类**
+
+- 错误码定义规则为 5 为数字
+
+- 前两位表示业务场景，最后三位表示错误码。例如：100001。10:通用 001:系统未知异常
+- 维护错误码后需要维护错误描述，将他们定义为枚举形式
+
+10 通用，11商品，12订单，13购物车，14物流
+
+```java
+return R.error(BizCodeEnume.VAILE_EXCEPTION.getCode(), BizCodeEnume.VAILE_EXCEPTION.getMsg()).put("data", errorMap);
+```
+
+JSR303分组校验
+
+- 新增品牌的时候，由于ID是自动生成的自增长ID，所以新增的时候不携带ID
+- 修改品牌的时候，需要根据ID进行修改
+
+有不同的校验场景
+
+entity里
+
+```java
+@NotNull(message = "修改必须指定品牌id", groups = {UpdateGroup.class})
+@NotBlank(message = "品牌名必须提交", groups = {UpdateGroup.class, AddGroup.class})
+@TableId
+private Long brandId;
+```
+
+Controller 里
+
+```java
+@RequestMapping("/save")
+public R save(@Validated({AddGroup.class}) @RequestBody BrandEntity brand/*, BindingResult result*/) {
+    brandService.save(brand);
+    return R.ok();
+}
+```
+
+默认不分组的话有@Validated不会生效，只有不分组才生效，比如 `@NotEmpty`
+
+自定义校验
+
+1. 编写一个自定义的校验注解
+2. 编写一个自定义的校验器
+3. 关联自定义的校验器和自定义的校验注解 `让校验器校验校验注解标识的字段`
+
+Annotation的
+
+注解必须拥有三个属性
+
+- message：当校验出错后，错误信息去哪取
+- groups：支持分组校验
+- payload：自定义负载信息
+
+注解必须有以下原信息数据
+
+```java
+@Documented
+@Constraint(validatedBy = {ListValueConstraintValidator.class})
+@Target({ElementType.METHOD,ElementType.FIELD,ElementType.ANNOTATION_TYPE,ElementType.CONSTRUCTOR, ElementType.PARAMETER, ElementType.TYPE_USE})
+@Retention(RetentionPolicy.RUNTIME)
+```
+
+- Target：注解可以标注在哪些位置
+- Retention：时机，可以在运行时获取到
+- Constraint：注解使用哪个校验器进行校验，可以指定校验器
+
+创建校验器类文件`ListValueConstraintValidator.java`
+
+`ListValueConstraintValidator`实现接口`ConstraintValidator`
+
+`ConstraintValidator`接口包含两个泛型，第一个为对应注解，第二个为校验数据类型
+
+`initialize`初始化方法 参数`constraintAnnotation`包含默认合法的值
+
+`isValid`校验方法 参数`integer`为提交过来需要检验的值
+
+```java
+package com.atguigu.common.valid;
+
+import javax.validation.ConstraintValidator;
+import javax.validation.ConstraintValidatorContext;
+import java.util.HashSet;
+import java.util.Set;
+
+public class ListValueConstraintValidator implements ConstraintValidator<ListValue, Integer> {
+
+    private Set<Integer> set = new HashSet<>();
+
+    // 初始化方法
+    @Override
+    public void initialize(ListValue constraintAnnotation) {
+        // 合法的值
+        int[] values = constraintAnnotation.values();
+        // 将合法值全部放到set中，便于查找是否存在
+        for (int value : values) {
+            set.add(value);
+        }
+    }
+
+    // 判断是否校验成功
+    @Override
+    /*
+     *
+     * @params value 提交过来需要检验的值
+     * @params context 校验的上下文环境信息
+     * @return
+     */
+    public boolean isValid(Integer value, ConstraintValidatorContext constraintValidatorContext) {
+        return set.contains(value);
+    }
+}
+
+```
 
 
-# API属性分类+平台属性 2.25
 
-# 新增商品 2.26
+# API属性分类+平台属性 
 
-# 仓库管理 2.27
+**SPU：Standard Product Unit**
 
-# ES 2.28
+是商品信息聚合的最小单位，是一组可复用、易检索的标准化信息的集合，该集合描述了一个产品的特性
+
+iphoneX 是 SPU、MI 8 是 SPU
+
+iphoneX 64G 黑曜石 是 SKU
+
+MI8 8+64G+黑色 是 SKU
+
+**SKU：Stock Keeping Unit**
+
+即库存进出计量的基本单元，可以是以件，盒，托盘等为单位
+
+
+
+# 新增商品 
+
+# 仓库管理 
+
+# ES 
 
 # 商品上架 
 
