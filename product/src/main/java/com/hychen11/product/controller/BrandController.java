@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.hychen11.common.valid.AddGroup;
 import com.hychen11.common.valid.UpdateGroup;
+import com.hychen11.common.valid.UpdateStatusGroup;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
@@ -71,6 +72,15 @@ public class BrandController {
             return R.error(400,"illegal data").put("data",map);
         }
 		brandService.save(brand);
+        return R.ok();
+    }
+
+    /**
+     * 修改品牌显示状态
+     */
+    @RequestMapping("/update/status")
+    public R updateStatus(@Validated({UpdateStatusGroup.class}) @RequestBody BrandEntity brand){
+        brandService.updateById(brand);
         return R.ok();
     }
 
