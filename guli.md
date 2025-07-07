@@ -1505,31 +1505,218 @@ public class ListValueConstraintValidator implements ConstraintValidator<ListVal
 
 ```
 
+#### 分组校验总结一下
 
+这里定义好分组接口
+
+```java
+public interface AddGroup {}
+public interface UpdateGroup {}
+```
+
+不需要写别的内容
+
+随后在Entity里定义不同的groups
+
+Controller中指定校验分组 @Validated({XXX.class})，注意这里@Valid是不分组的
 
 # API属性分类+平台属性 
 
 **SPU：Standard Product Unit**
 
-是商品信息聚合的最小单位，是一组可复用、易检索的标准化信息的集合，该集合描述了一个产品的特性
-
-iphoneX 是 SPU、MI 8 是 SPU
-
-iphoneX 64G 黑曜石 是 SKU
-
-MI8 8+64G+黑色 是 SKU
+就比如MacBook air
 
 **SKU：Stock Keeping Unit**
 
-即库存进出计量的基本单元，可以是以件，盒，托盘等为单位
+就比如带配置的macbook air，13寸，16+256
 
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/4b0e6e36ba48e4c6542ec38dc13445b3.png)
 
+三级分类树很多地方都要使用，因此新建common文件夹，存放公共组件
+
+子组件：`category.vue`
+
+```vue
+this.$emit("event-name",data1,data2...)
+nodeclick(data, node, component) {
+    //向父组件发送事件；
+    this.$emit("tree-node-click", data, node, component);
+}
+```
+
+父组件：`attrgroup.vue`
+
+```vue
+<category @tree-node-click="treenodeclick"></category>
+···
+<script>
+methods:{
+    // 感知树节点被点击
+    treenodeclick(data, node, component) {
+      if (node.level === 3) {
+        this.catId = data.catId;
+        this.getDataList(); //重新查询
+      }
+    },
+}
+</script>
+```
+
+Get `/product/attrgroup/list/{catelogId}`
+
+#### QueryWrapper!!!
+
+1. `new QueryWrapper<E>()`：E 查询表格对应实体类
+2. `.eq(columu,value);`：查询columu一列等于value值的结果
+3. `wrapper.and(()->{})`：拼接查询条件
+4. `or()`：或者
+5. `like`：双%的like
+
+```java
+@Override
+    public PageUtils queryPage(Map<String, Object> params, Long cateLogId) {
+        if (cateLogId == 0) {
+            return queryPage(params);
+        } else {
+            String key = (String) params.get("key");
+            QueryWrapper<AttrGroupEntity> wrapper = new QueryWrapper<AttrGroupEntity>().eq("catelog_id", cateLogId);
+            if (!StringUtils.isEmpty(key)) {
+                wrapper.and(
+                        (obj) -> {
+                            obj.eq("attr_group_id", key).or().like("attr_group_name", key);
+                        }
+                );
+            }
+            IPage<AttrGroupEntity> page = this.page(new Query<AttrGroupEntity>().getPage(params), wrapper);
+            return new PageUtils(page);
+        }
+    }
+```
+
+这个是MyBatis的分页查询
+
+```java
+IPage<AttrEntity> page = this.page(
+    new Query<AttrEntity>().getPage(params),
+    new QueryWrapper<AttrEntity>()
+);
+return new PageUtils(page);
+```
+
+- `Query.getPage(params)`：根据传入的 Map（如 page, limit）生成分页对象。
+- `new QueryWrapper<>()`：生成空查询条件。
+- 最终作用：分页查询所有 `AttrEntity` 数据（不加任何筛选条件）。
+
+这里的wrapper相当于查询条件
+
+```java
+QueryWrapper<Entitiy> wrapper = QueryWrapper<Entitiy>().eq("id",id);
+wrapper.add((obj)->{obj.eq("group_id",key).or().like("group_name",key)});
+```
+
+这里查询条件"id"=id，然后`add(()->{})`就是拼接查询条件，`.or()`或者，`like()` 等于`%key%`
 
 # 新增商品 
 
 # 仓库管理 
 
 # ES 
+
+快速地储存、搜索和分析海量数据
+
+维基百科、Stack Overflow、Github 都采用它
+
+底层是开源库 Lucene，Elastic 是 Lucene 的封装，提供了 REST API 的操作接口，开箱即用
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/49e0ca90136abfd99c1686d6935500c4.png)
+
+Index相当于数据库，Type相当于数据表，Document相当于数据
+
+倒排索引机制 Inverted index 略
+
+Docker 安装
+
+elasticsearch：存储和检索数据
+
+kibana：可视化检索数据
+
+```shell
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+```
+
+chmod权限是 owner，group，others
+
+rwx r4 w2 x1 -0, rwx=7,rw-=6,r-x=5
+
+-d后台运行，-it交互模式
+
+```shell
+docker run --name es01 \
+-p 9200:9200 -p 9300:9300 \
+--restart=always \
+-e "discovery.type=single-node" \
+-e "xpack.security.enabled=false" \
+-e ES_JAVA_OPTS="-Xms512m -Xmx512m" \
+-v $PWD/esdata:/usr/share/elasticsearch/data \
+-d docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+```
+
+如果需要自动启动，docker run里加上 --restart = always
+
+-xms 初始，-xmx最大内存
+
+```shell
+(base) ➜  ~ curl http://localhost:9200
+{
+  "name" : "e3c2ddb8a613",
+  "cluster_name" : "docker-cluster",
+  "cluster_uuid" : "MnZ2L1SDRlKuIHVPmKPmsw",
+  "version" : {
+    "number" : "8.17.0",
+    "build_flavor" : "default",
+    "build_type" : "docker",
+    "build_hash" : "2b6a7fed44faa321997703718f07ee0420804b41",
+    "build_date" : "2024-12-11T12:08:05.663969764Z",
+    "build_snapshot" : false,
+    "lucene_version" : "9.12.0",
+    "minimum_wire_compatibility_version" : "7.17.0",
+    "minimum_index_compatibility_version" : "7.0.0"
+  },
+  "tagline" : "You Know, for Search"
+}
+```
+
+```shell
+docker pull docker.elastic.co/kibana/kibana:8.17.0
+
+docker run --name kibana \
+	--restart=always \
+  -e ELASTICSEARCH_HOSTS=http://host.docker.internal:9200 \
+  -e SERVER_HOST=0.0.0.0 \
+  -e XPACK_SECURITY_ENABLED=false \
+  -p 5601:5601 \
+  -d docker.elastic.co/kibana/kibana:8.17.0
+```
+
+docker**等号两边不能有空格**，它会被当作无效参数
+
+`GET http://localhost:9200/_cat/nodes`
+
+查看所有节点`172.17.0.5 42 85 10 0.48 0.65 0.38 cdfhilmrstw * e3c2ddb8a613`
+
+`GET http://localhost:9200/_cat/health`
+
+查看节点健康情况`1749957310 03:15:10 docker-cluster green 1 1 27 27 0 0 0 0 0 - 100.0%`
+
+`GET http://localhost:9200/_cat/master`
+
+查看主节点`h_kDoe8ARR6GROVFtCUvqQ 172.17.0.5 172.17.0.5 e3c2ddb8a613`
+
+`GET http://localhost:9200/_cat/indices`
+
+查看所有索引 show databases;
+
+
 
 # 商品上架 
 
