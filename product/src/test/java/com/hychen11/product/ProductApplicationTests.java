@@ -1,25 +1,27 @@
 package com.hychen11.product;
 
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.hychen11.product.entity.BrandEntity;
-import com.hychen11.product.service.BrandService;
-import org.checkerframework.checker.units.qual.A;
+import com.hychen11.product.service.CategoryService;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.List;
+import javax.annotation.Resource;
+import java.util.Arrays;
 
 @SpringBootTest
+@Slf4j
 class ProductApplicationTests {
-    @Autowired
-    BrandService brandService;
+    @Resource
+    private CategoryService categoryService;
+
+    @Test
+    public void testFindPath() {
+        Long[] catelogPath = categoryService.findCatelogPath(226L);
+        log.info("完整路径：{}", Arrays.asList(catelogPath));
+    }
 
     @Test
     void contextLoads() {
-        List<BrandEntity> list=brandService.list(new QueryWrapper<BrandEntity>().eq("brand_id",1L));
-        list.forEach(item->System.out.println(item));
     }
 
 }

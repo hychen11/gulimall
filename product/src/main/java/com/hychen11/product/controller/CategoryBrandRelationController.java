@@ -1,14 +1,12 @@
 package com.hychen11.product.controller;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClientImportSelector;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.product.entity.CategoryBrandRelationEntity;
 import com.hychen11.product.service.CategoryBrandRelationService;
@@ -56,8 +54,8 @@ public class CategoryBrandRelationController {
      */
     @RequestMapping("/save")
     public R save(@RequestBody CategoryBrandRelationEntity categoryBrandRelation){
-		categoryBrandRelationService.save(categoryBrandRelation);
-
+//		categoryBrandRelationService.save(categoryBrandRelation);
+        categoryBrandRelationService.saveDetail(categoryBrandRelation);
         return R.ok();
     }
 
@@ -79,6 +77,12 @@ public class CategoryBrandRelationController {
 		categoryBrandRelationService.removeByIds(Arrays.asList(ids));
 
         return R.ok();
+    }
+
+    @GetMapping("/catelog/list")
+    public R catelogList(Long brandId){
+        List<CategoryBrandRelationEntity> entities = categoryBrandRelationService.catelogList(brandId);
+        return R.ok().put("data",entities);
     }
 
 }

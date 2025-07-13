@@ -1616,7 +1616,25 @@ wrapper.add((obj)->{obj.eq("group_id",key).or().like("group_name",key)});
 
 这里查询条件"id"=id，然后`add(()->{})`就是拼接查询条件，`.or()`或者，`like()` 等于`%key%`
 
+
+
+ 这里略过一堆
+
+VO就是value object，就是试图对象，页面传过来的
+
 # 新增商品 
+
+- Controller：处理请求，接受和校验数据
+- Service接受controller传来的数据，进行业务处理
+- Controller接受Service处理完的数据，封装页面指定的vo
+
+逆向生成VO `https://www.json.cn/json/json2java.html` 生成JavaBean
+
+涉及小数的数据`double`类型改为`BigDecimal`
+
+如果需要在Entity里新增字段，`@TableField(exist = false)` MyBatis-Plus 中的注解，用于表示 **该字段不是数据库表中的列**。
+
+`@JsonInclude(JsonInclude.Include.NON_EMPTY)`  只在序列化时包含 **非空值** 的字段
 
 # 仓库管理 
 

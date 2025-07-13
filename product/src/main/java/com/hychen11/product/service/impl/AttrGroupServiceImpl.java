@@ -1,5 +1,7 @@
 package com.hychen11.product.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 import java.util.Map;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -26,4 +28,21 @@ public class AttrGroupServiceImpl extends ServiceImpl<AttrGroupDao, AttrGroupEnt
         return new PageUtils(page);
     }
 
+    @Override
+    public PageUtils queryPageByCatelogId(Map<String, Object> params,Long catelogId){
+        String key = (String) params.get("key");
+        LambdaQueryWrapper<AttrGroupEntity> wrapper = new LambdaQueryWrapper<>();
+        if (!StringUtils.isEmpty(key)) {
+            wrapper.and((obj) -> obj.eq(AttrGroupEntity::getAttrGroupId, key).or()
+                    .like(AttrGroupEntity::getAttrGroupName,key));
+        }
+        if (catelogId == 0) {
+            IPage<AttrGroupEntity> page = this.page(new Query<AttrGroupEntity>().getPage(params),wrapper);
+            return new PageUtils(page);
+        } else {
+            wrapper.eq(AttrGroupEntity::getCatelogId, catelogId);
+            IPage<AttrGroupEntity> page = this.page(new Query<AttrGroupEntity>().getPage(params), wrapper);
+            return new PageUtils(page);
+        }
+    }
 }
