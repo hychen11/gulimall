@@ -1636,6 +1636,22 @@ VO就是value object，就是试图对象，页面传过来的
 
 `@JsonInclude(JsonInclude.Include.NON_EMPTY)`  只在序列化时包含 **非空值** 的字段
 
+关于Mybatis
+
+```
+<insert id="insertBatch" useGeneratedKeys="true">
+```
+
+`useGeneratedKeys="true"`：表示数据库主键是自增的（一般用于获取插入后生成的主键），但这里没有绑定返回主键，其实可以省略。
+
+```
+<foreach collection="relations" item="relation" separator=",">
+    (#{relation.attrId},#{relation.attrGroupId})
+</foreach>
+```
+
+`foreach` 是 MyBatis 的动态 SQL 标签，用于 **遍历一个集合（List/Set/数组）并生成重复语句**。
+
 # 仓库管理 
 
 # ES 

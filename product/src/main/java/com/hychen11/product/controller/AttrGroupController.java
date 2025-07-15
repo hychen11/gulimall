@@ -1,15 +1,16 @@
 package com.hychen11.product.controller;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+import com.hychen11.product.entity.AttrEntity;
+import com.hychen11.product.service.AttrAttrgroupRelationService;
+import com.hychen11.product.service.AttrService;
 import com.hychen11.product.service.CategoryService;
+import com.hychen11.product.vo.AttrGroupRelationVo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.product.entity.AttrGroupEntity;
 import com.hychen11.product.service.AttrGroupService;
@@ -32,6 +33,11 @@ public class AttrGroupController {
     private AttrGroupService attrGroupService;
     @Autowired
     private CategoryService categoryService;
+    @Autowired
+    private AttrService attrService;
+    @Autowired
+    private AttrAttrgroupRelationService relationService;
+
     /**
      * 列表
      */
@@ -41,6 +47,32 @@ public class AttrGroupController {
 
         return R.ok().put("page", page);
     }
+
+
+    /**
+     * 查询属性分组id关联属性
+     *
+     * @param attrGroupId
+     * @return
+     */
+    @GetMapping("{attrGroupId}/attr/relation")
+    public R attrRelation(@PathVariable Long attrGroupId) {
+        List<AttrEntity> attrEntities = attrService.getAttrRelation(attrGroupId);
+        return R.ok().put("data", attrEntities);
+    }
+
+    /**
+     * 删除关联关系
+     *
+     * @param
+     * @return
+     */
+    @PostMapping("/attr/relation/delete")
+    public R deleteRelation(@RequestBody AttrGroupRelationVo[] relationVos) {
+        attrService.deleteRelation(relationVos);
+        return R.ok();
+    }
+
 
 
     /**
@@ -82,6 +114,29 @@ public class AttrGroupController {
     public R delete(@RequestBody Long[] attrGroupIds){
 		attrGroupService.removeByIds(Arrays.asList(attrGroupIds));
 
+        return R.ok();
+    }
+
+    /**
+     * 分页查询自己没有关联的属性
+     * @param params
+     * @param attrGroupId
+     * @return
+     */
+    @GetMapping("/{attrGroupId}/noattr/relation")
+    public R noRelation(@RequestParam Map<String, Object> params, @PathVariable Long attrGroupId) {
+        PageUtils page = attrService.noRelaitonList(params,attrGroupId);
+        return R.ok().put("page",page);
+    }
+
+    /**
+     * 新增关系
+     * @param relationVos
+     * @return
+     */
+    @PostMapping("/attr/relation")
+    public R addAttrRelation(@RequestBody AttrGroupRelationVo[] relationVos){
+        relationService.addAttrRelaiton(relationVos);
         return R.ok();
     }
 

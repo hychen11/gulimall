@@ -3,6 +3,7 @@ package com.hychen11.product.controller;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.hychen11.product.vo.AttrRespVo;
 import com.hychen11.product.vo.AttrVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,12 +33,11 @@ public class AttrController {
     private AttrService attrService;
 
     /**
-     * 列表
+     * 列表,如果attrType = 0 是销售属性 1 为普通属性
      */
-    @RequestMapping("base/list/{catelogId}")
-    public R list(@RequestParam Map<String, Object> params){
-        PageUtils page = attrService.queryPage(params);
-
+    @RequestMapping("/{attrType}/list/{catelogId}")
+    public R list(@RequestParam Map<String, Object> params, @PathVariable("attrType") String attrType, @PathVariable("catelogId") Long catelogId) {
+        PageUtils page = attrService.queryPage(params, attrType, catelogId);
         return R.ok().put("page", page);
     }
 
@@ -47,7 +47,7 @@ public class AttrController {
      */
     @RequestMapping("/info/{attrId}")
     public R info(@PathVariable("attrId") Long attrId){
-		AttrEntity attr = attrService.getById(attrId);
+        AttrRespVo attr = attrService.getAttrInfo(attrId);
 
         return R.ok().put("attr", attr);
     }
@@ -66,8 +66,8 @@ public class AttrController {
      * 修改
      */
     @RequestMapping("/update")
-    public R update(@RequestBody AttrEntity attr){
-		attrService.updateById(attr);
+    public R update(@RequestBody AttrVo attr){
+		attrService.updateCascade(attr);
 
         return R.ok();
     }
@@ -77,7 +77,7 @@ public class AttrController {
      */
     @RequestMapping("/delete")
     public R delete(@RequestBody Long[] attrIds){
-		attrService.removeByIds(Arrays.asList(attrIds));
+		attrService.removeCascade(Arrays.asList(attrIds));
 
         return R.ok();
     }

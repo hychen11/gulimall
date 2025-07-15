@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.hychen11.common.utils.PageUtils;
 import com.hychen11.product.entity.AttrEntity;
 import com.hychen11.product.vo.AttrVo;
+import com.hychen11.product.vo.AttrRespVo;
+import com.hychen11.product.vo.AttrGroupRelationVo;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,8 +19,21 @@ import java.util.Map;
  */
 public interface AttrService extends IService<AttrEntity> {
 
-    PageUtils queryPage(Map<String, Object> params);
 
     void saveAttr(AttrVo attr);
+
+    List<AttrEntity> getAttrRelation(Long attrGroupId);
+
+    void deleteRelation(AttrGroupRelationVo[] relationVos);
+
+    PageUtils noRelaitonList(Map<String, Object> params, Long attrGroupId);
+
+    AttrRespVo getAttrInfo(Long attrId);
+
+    void updateCascade(AttrVo attr);
+
+    void removeCascade(List<Long> list);
+
+    PageUtils queryPage(Map<String, Object> params, String attrType, Long catelogId);
 }
 
