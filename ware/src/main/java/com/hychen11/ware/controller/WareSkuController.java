@@ -1,14 +1,12 @@
 package com.hychen11.ware.controller;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+import com.hychen11.common.to.SkuHasStockTo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.ware.entity.WareSkuEntity;
 import com.hychen11.ware.service.WareSkuService;
@@ -35,7 +33,7 @@ public class WareSkuController {
      */
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params){
-        PageUtils page = wareSkuService.queryPage(params);
+        PageUtils page = wareSkuService.queryPageByCondition(params);
 
         return R.ok().put("page", page);
     }
@@ -81,4 +79,13 @@ public class WareSkuController {
         return R.ok();
     }
 
+    /**
+     * 查询sku是否有库存
+     * @param skuIds
+     * @return
+     */
+    @PostMapping("/hasStock")
+    public List<SkuHasStockTo> getSkusHasStock(@RequestBody List<Long> skuIds) {
+        return wareSkuService.getSkusHasStock(skuIds);
+    }
 }

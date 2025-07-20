@@ -12,6 +12,8 @@ spring:
         password: "nacos"
   application:
     name: ware
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
 
 mybatis-plus:
   mapper-locations: classpath:/mapper/**/*.xml
@@ -21,3 +23,7 @@ mybatis-plus:
 
 server:
   port: 11000
+
+logging:
+  level:
+    com.hychen11: debug

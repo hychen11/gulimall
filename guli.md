@@ -1765,7 +1765,7 @@ start
 end
 ```
 
-这里调用coupon需要使用openfeign
+这里调用coupon需要使用openfeign，首先在启动类上加上`@EnableFeignClients(basePackages = "com.hychen11.product.feign")`
 
 ```
  /**
@@ -1829,7 +1829,7 @@ docker pull docker.elastic.co/elasticsearch/elasticsearch:8.17.0
 
 chmod权限是 owner，group，others
 
-rwx r4 w2 x1 -0, rwx=7,rw-=6,r-x=5
+**rwx r4 w2 x1** -0, rwx=7,rw-=6,r-x=5
 
 -d后台运行，-it交互模式
 

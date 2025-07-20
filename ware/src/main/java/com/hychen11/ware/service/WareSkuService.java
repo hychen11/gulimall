@@ -1,9 +1,11 @@
 package com.hychen11.ware.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.hychen11.common.to.SkuHasStockTo;
 import com.hychen11.common.utils.PageUtils;
 import com.hychen11.ware.entity.WareSkuEntity;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,5 +18,11 @@ import java.util.Map;
 public interface WareSkuService extends IService<WareSkuEntity> {
 
     PageUtils queryPage(Map<String, Object> params);
+
+    PageUtils queryPageByCondition(Map<String, Object> params);
+
+    void addStock(WareSkuEntity wareSkuEntity);
+
+    List<SkuHasStockTo> getSkusHasStock(List<Long> skuIds);
 }
 
