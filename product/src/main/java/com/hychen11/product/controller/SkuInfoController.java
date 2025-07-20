@@ -3,6 +3,8 @@ package com.hychen11.product.controller;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.hychen11.common.to.SkuInfoTo;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,11 +37,23 @@ public class SkuInfoController {
      */
     @RequestMapping("/list")
     public R list(@RequestParam Map<String, Object> params){
-        PageUtils page = skuInfoService.queryPage(params);
+        PageUtils page = skuInfoService.queryPageByCondition(params);
 
         return R.ok().put("page", page);
     }
 
+    /**
+     * 远程调用openFeign查询skuInfo
+     * @param skuId
+     * @return
+     */
+    @RequestMapping("infoBySkuId")
+    public SkuInfoTo infoBySkuId(@RequestParam Long skuId){
+        SkuInfoEntity skuInfo = skuInfoService.getById(skuId);
+        SkuInfoTo skuInfoTo = new SkuInfoTo();
+        BeanUtils.copyProperties(skuInfo,skuInfoTo);
+        return skuInfoTo;
+    }
 
     /**
      * 信息

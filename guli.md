@@ -609,7 +609,7 @@ Feign 允许开发者定义接口，并通过注解方式指定接口方法要�
 
 有一个 `UserService`，另一个服务 `OrderService` 想调用它的 `/user/info` 接口。可以这样定义 Feign 客户端接口：
 
-`**@FeignClient(name = "coupon", url ="http://localhost:7000")**`如果未指定 url，会根据 name 在 Eureka/Nacos 等注册中心寻找 coupon 服务
+`@FeignClient(name = "coupon", url ="http://localhost:7000")`如果未指定 url，会根据 name 在 Eureka/Nacos 等注册中心寻找 coupon 服务
 
 ```java
 import org.springframework.cloud.openfeign.FeignClient;
@@ -1654,7 +1654,156 @@ VO就是value object，就是试图对象，页面传过来的
 
 # 仓库管理 
 
+首先要配置负载均衡
+
+这里有一个问题
+
+nacos的dependency默认引入ribbon，但是这个已经停止维护
+
+```xml
+<dependency>
+    <groupId>com.alibaba.cloud</groupId>
+    <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
+```
+
+你不手动排除，它就会和 loadbalancer 混用，可能造成：
+
+- 加载两个负载均衡器
+- Bean 注入冲突
+- 报错：`IllegalStateException: LoadBalancerClientFactory` 或 `No qualifying bean of type`
+
+```xml
+<exclusions>
+    <exclusion>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-starter-netflix-ribbon</artifactId>
+    </exclusion>
+</exclusions>
+```
+
+> **Ribbon 是旧的负载均衡组件，Spring Cloud LoadBalancer 是官方推荐的新组件**，两者都是做客户端负载均衡，但**不兼容，不能共存，会冲突**。
+
+### JSON解释器
+
+```yaml
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+```
+
+jackson 是默认的JSON解释器
+
+### 开启事务 @Transactional
+
+启动类加上`@EnableTransactionManagement`
+
+`@Transactional` 要放在 **public 方法** 上才会生效（AOP 代理）
+
+如果类内部自调用某个标注了 `@Transactional` 的方法，也不会触发事务（因为没走代理）
+
+默认用的是 Spring AOP 动态代理机制（可切换为 AspectJ）
+
+`type=IdType.INPUT` Mybatis里手动设置主键
+
+| 类型          | 说明                                             |
+| ------------- | ------------------------------------------------ |
+| `AUTO`        | 数据库自增主键（如 MySQL 的 `AUTO_INCREMENT`）   |
+| `NONE`        | 不指定主键策略（默认）                           |
+| `INPUT`       | 用户输入（手动设置主键）✅你用的这个              |
+| `ASSIGN_ID`   | 使用全局唯一 ID 策略（雪花算法，默认 long 类型） |
+| `ASSIGN_UUID` | 使用 UUID 生成主键（字符串类型）                 |
+
+| 实体名                   | 含义                                        |
+| ------------------------ | ------------------------------------------- |
+| `ProductAttrValueEntity` | 存储产品的属性值，比如颜色=黑色，屏幕=6.5寸 |
+| `AttrEntity`             | 属性的定义，比如 “颜色”、“尺寸”、“内存容量” |
+| `SpuInfoEntity`          | SPU 基本信息，如名称、品牌、分类            |
+| `SkuInfoEntity`          | SKU 基本信息，关联 SPU，具体某个变体        |
+
+###  保存商品 SPU
+
+首先`BeanUtils.copyProperties(source,target)`通过`spuInfoDao`存入SPU表
+
+然后保存SPU 描述 封装在`SpuInfoDescEntity`里，然后这个存在`spuInfoDescDao`里
+
+再保存Spu的图片集 spuImagesService.saveBatch批量保存
+
+保存Spu的规格参数
+
+保存 SPU 的积分信息，远程调用 `coupon` 模块
+
+保存 SPU 关联的所有 SKU 信息： skuinfo，skuimage，skusaleattr，coupon
+
+```rust
+start
+  |
+  v
+保存SPU基本信息 -> spuInfoDao.insert(spuInfoEntity)
+  |
+  v
+保存SPU描述图片 -> spuInfoDescDao.insert(spuInfoDescEntity)
+  |
+  v
+保存SPU图片集 -> spuImagesService.saveBatch(spuImages)
+  |
+  v
+保存SPU规格参数 -> productAttrValueService.saveBatch(valueEntities)
+  |
+  v
+远程保存SPU积分信息 -> couponFeignService.saveSpuBounds(spuBoundTo)
+  |
+  v
+遍历所有SKU:
+  ├─> 保存SKU基本信息 -> skuInfoService.save(skuInfoEntity)
+  |       |
+  |       ├─> 保存SKU图片信息 -> skuImagesService.saveBatch(skuImages)
+  |       |
+  |       ├─> 保存SKU销售属性 -> skuSaleAttrValueService.saveBatch(attrSaleValues)
+  |       |
+  |       └─> 远程保存SKU优惠信息 -> couponFeignService.saveSkuReduction(skuReductionTo)
+  |
+  v
+end
+```
+
+这里调用coupon需要使用openfeign
+
+```
+ /**
+ * 1.CouponFeignService.saveSpuBounds(spuBoundTo);
+ *      1).@RequestBody将spuBoundTo这个对象转为json
+ *      2).找到gulimall-coupon这个服务，给coupon/spubounds/save发送请求
+ *      将上一步转的json放在请求体位置发送请求
+ *      3).对方服务收到请求。收到的是请求体的json数据
+ *          @RequestBody SpuBoundsEntity spuBounds: 将请求体的json转为SpuBoundsEntity
+ * 只要json数据模型是兼容的，双方服务无需使用同一个to
+ * @param spuBoundTo
+ * @return
+ */
+```
+
+这里首先调用Feign，然后找到调用服务的api，然后这里如果模型兼容就ok，比如这里的SpuBoundTo和目标的
+
+```java
+@FeignClient(name="coupon")//服务名
+public interface CouponFeignService {
+    @PostMapping("coupon/spubounds/save")
+    R saveSpuBounds(@RequestBody SpuBoundTo spuBoundTo );
+
+    @PostMapping("coupon/skufullreduction/saveInfo")
+    R saveSkuReduction(@RequestBody SkuReductionTo skuReductionTo);
+}
+
+```
+
+**@JsonIgnoreProperties(ignoreUnknown = true)**：这其实是默认行为，在 Spring Boot 中默认 Jackson 配置会忽略多余字段。
+
+在使用 `@RequestBody`（配合 Jackson 反序列化）时，只有 JSON 中和目标类字段“匹配得上”的字段，才会被赋值。
+
+`@RequestBody`就是将JSON转换成Java对象
+
 # ES 
+
+9300 tcp 废弃, 9200 http
 
 快速地储存、搜索和分析海量数据
 

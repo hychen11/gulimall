@@ -3,12 +3,9 @@ package com.hychen11.coupon.controller;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.hychen11.common.to.SkuReductionTo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.coupon.entity.SkuFullReductionEntity;
 import com.hychen11.coupon.service.SkuFullReductionService;
@@ -38,6 +35,12 @@ public class SkuFullReductionController {
         PageUtils page = skuFullReductionService.queryPage(params);
 
         return R.ok().put("page", page);
+    }
+
+    @PostMapping("/saveInfo")
+    public R saveSkuReduction(@RequestBody SkuReductionTo skuReductionTo){
+        skuFullReductionService.saveSkuReduction(skuReductionTo);
+        return R.ok();
     }
 
 

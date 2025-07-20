@@ -3,12 +3,6 @@ package com.hychen11.product.vo;
 import com.baomidou.mybatisplus.annotation.TableId;
 import lombok.Data;
 
-/**
- * @author ：zxl
- * @Description:
- * @ClassName: AttrVo
- * @date ：2024/10/28 21:08
- */
 @Data
 public class AttrVo {
     /**

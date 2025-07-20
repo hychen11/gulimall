@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import com.hychen11.product.entity.BrandEntity;
+import com.hychen11.product.vo.BrandVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClientImportSelector;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +38,26 @@ public class CategoryBrandRelationController {
         PageUtils page = categoryBrandRelationService.queryPage(params);
 
         return R.ok().put("page", page);
+    }
+
+    /**
+     * 查询分类关联品牌
+     * @param catId
+     * @return
+     */
+    @GetMapping("/brands/list")
+    public R list(@RequestParam(value = "catId",required = true) Long catId){
+        List<BrandEntity> brandEntities = categoryBrandRelationService.brandsList(catId);
+        List<BrandVo> brandVos = null;
+        if(brandEntities!=null) {
+            brandVos = brandEntities.stream().map((brandEntity -> {
+                BrandVo brandVo = new BrandVo();
+                brandVo.setBrandName(brandEntity.getName());
+                brandVo.setBrandId(brandEntity.getBrandId());
+                return brandVo;
+            })).toList();
+        }
+        return R.ok().put("data",brandVos);
     }
 
 

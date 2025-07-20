@@ -70,4 +70,16 @@ public class CategoryBrandRelationServiceImpl extends ServiceImpl<CategoryBrandR
         categoryBrandRelationDao.updateCategory(catId,name);
     }
 
+    @Override
+    public   List<BrandEntity> brandsList(Long catId){
+        List<CategoryBrandRelationEntity> relations =
+                categoryBrandRelationDao.selectList(new LambdaQueryWrapper<CategoryBrandRelationEntity>()
+                        .eq(CategoryBrandRelationEntity::getCatelogId, catId));
+        List<Long> brandIds = relations.stream().map(CategoryBrandRelationEntity::getBrandId).toList();
+        if(!brandIds.isEmpty()){
+            return brandDao.selectBatchIds(brandIds);
+        }
+        return null;
+    }
+
 }

@@ -1,16 +1,15 @@
 package com.hychen11.product.controller;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+import com.hychen11.product.entity.ProductAttrValueEntity;
+import com.hychen11.product.service.ProductAttrValueService;
 import com.hychen11.product.vo.AttrRespVo;
 import com.hychen11.product.vo.AttrVo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.product.entity.AttrEntity;
 import com.hychen11.product.service.AttrService;
@@ -31,6 +30,19 @@ import com.hychen11.common.utils.R;
 public class AttrController {
     @Autowired
     private AttrService attrService;
+    @Autowired
+    private ProductAttrValueService productAttrValueService;
+
+    /**
+     * spu管理规格维护数据回显
+     * @param spuId
+     * @return
+     */
+    @GetMapping("/base/listforspu/{spuId}")
+    public R baseAttrListForSpu(@PathVariable Long spuId) {
+        List<ProductAttrValueEntity> entities = productAttrValueService.baseAttrListForSpu(spuId);
+        return R.ok().put("data", entities);
+    }
 
     /**
      * 列表,如果attrType = 0 是销售属性 1 为普通属性
@@ -69,6 +81,18 @@ public class AttrController {
     public R update(@RequestBody AttrVo attr){
 		attrService.updateCascade(attr);
 
+        return R.ok();
+    }
+
+    /**
+     * 根据spuId批量修改
+     * @param spuId
+     * @param entities
+     * @return
+     */
+    @PostMapping("/update/{spuId}")
+    public R updateSpuAttr(@PathVariable Long spuId,@RequestBody List<ProductAttrValueEntity> entities) {
+        productAttrValueService.updateSpuAttr(spuId,entities);
         return R.ok();
     }
 
