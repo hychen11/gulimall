@@ -16,5 +16,15 @@
         <result property="showDesc" column="show_desc"/>
     </resultMap>
 
+    <select id="selectSearchAttrIds" resultType="java.lang.Long">
+        SELECT gulimall_pms.pms_attr.attr_id
+        FROM gulimall_pms.pms_attr
+        WHERE search_type = 1
+        AND attr_id IN
+        <foreach collection="attrIds" item="attrId" separator="," open="(" close=")">
+            #{attrId}
+        </foreach>
+    </select>
+
 
 </mapper>

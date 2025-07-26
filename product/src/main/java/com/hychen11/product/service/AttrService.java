@@ -35,5 +35,7 @@ public interface AttrService extends IService<AttrEntity> {
     void removeCascade(List<Long> list);
 
     PageUtils queryPage(Map<String, Object> params, String attrType, Long catelogId);
+
+    List<Long> selectSearchAttrIds(List<Long> attrIds);
 }
 

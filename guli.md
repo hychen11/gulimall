@@ -2113,8 +2113,6 @@ for (SearchHit hit : searchHits) {
 }
 ```
 
-
-
 ### Nginx docker 安装
 
 ```shell
@@ -2145,7 +2143,42 @@ nginx:1.25
 
 # 商品上架 
 
+`up(Long spuId)` 方法是 **商品上架** 的核心逻辑，主要是将指定 `spuId` 对应的商品数据构建为 Elasticsearch 可检索的数据模型，并远程调用 `search` 服务将数据保存到 ES 中，实现商品的“上架”。
+
+```java
+@Override
+public List<SkuInfoEntity> getSkuBySpuId(Long spuId){
+    LambdaQueryWrapper<SkuInfoEntity> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(SkuInfoEntity::getSkuId,spuId);
+    List<SkuInfoEntity> skuInfoEntityLits = skuInfoDao.selectList(wrapper);
+    return skuInfoEntityLits;
+}
+```
+
+Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体类中的 `skuId` 字段。MyBatis-Plus 会自动将它解析成数据库字段名，比如 `sku_id`
+
+### 注意 syntactic suger
+
+看似请求或者查询的任务，实际上在 RESTful API 里，如果复杂的请求，一般放在body里
+
+`@GetMapping` 不支持 `@RequestBody` 传 JSON，只能`@RequestParam` 在URL里传
+
+**HTTP GET 方法本质上不允许有 body**，而只能通过 URL query 参数
+
+`@PostMapping` 支持 `@RequestBody` 传JSON
+
+如果你今后写的是**支持前端复杂搜索过滤的接口**，比如分页、搜索条件筛选、多个字段组合查询，推荐统一使用 `POST` 携带 JSON 参数，这样更灵活，也更好扩展。
+
+`@PostMapping`, `@GetMapping`, `@PutMapping` **等本质上就是对 `@RequestMapping` 的语法糖（简化封装）**。
+
+```java
+@RequestMapping(value = "/hasStock", method = RequestMethod.GET)
+@GetMapping("/hasStock")
+```
+
 # 性能压测
+
+### Jmeter
 
 # 缓存 
 
@@ -2155,5 +2188,9 @@ nginx:1.25
 
 # 商品详情 
 
+# 推荐系统
 
+# 监控系统
+
+# 链路追踪
 

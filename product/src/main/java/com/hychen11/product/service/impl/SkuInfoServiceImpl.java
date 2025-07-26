@@ -5,6 +5,7 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -19,6 +20,12 @@ import com.hychen11.product.service.SkuInfoService;
 
 @Service("skuInfoService")
 public class SkuInfoServiceImpl extends ServiceImpl<SkuInfoDao, SkuInfoEntity> implements SkuInfoService {
+
+    private final SkuInfoDao skuInfoDao;
+
+    public SkuInfoServiceImpl(SkuInfoDao skuInfoDao) {
+        this.skuInfoDao = skuInfoDao;
+    }
 
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
@@ -67,5 +74,18 @@ public class SkuInfoServiceImpl extends ServiceImpl<SkuInfoDao, SkuInfoEntity> i
 
         IPage<SkuInfoEntity> page = this.page(new Query<SkuInfoEntity>().getPage(params), wrapper);
         return new PageUtils(page);
+    }
+
+    /**
+     * 根据spuId查sku
+     * @param spuId
+     * @return
+     */
+    @Override
+    public List<SkuInfoEntity> getSkuBySpuId(Long spuId){
+        LambdaQueryWrapper<SkuInfoEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SkuInfoEntity::getSkuId,spuId);
+        List<SkuInfoEntity> skuInfoEntityLits = skuInfoDao.selectList(wrapper);
+        return skuInfoEntityLits;
     }
 }
