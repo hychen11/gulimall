@@ -2143,7 +2143,178 @@ nginx:1.25
 
 # 商品上架 
 
+在电商系统中，**商品上架**这个操作，**本质上就是将一个完整的 SPU（标准产品单元）及其相关的 SKU（库存单位）信息，整合后存储到 Elasticsearch（ES）中，以便支持商品检索功能**
+
+将该商品的数据（SPU + SKU + 分类 + 品牌 + 属性等）从数据库中查出，经过封装和转换后**存入 Elasticsearch 索引中**，让搜索系统可以查到。
+
+涉及
+
+* SPU 基本信息（reduction，商品名、描述、品牌、分类）
+
+* SKU（每个规格的价格、库存、图片、标题）
+
+* 商品属性，用于筛选的规格参数（如颜色、尺寸、CPU 类型等）
+* 库存信息，该 SKU 是否有货（一般来自 ware 库存模块）
+* 品牌、分类名，便于展示和筛选
+* 热度评分，默认可以是 0，后续用来排序
+
 `up(Long spuId)` 方法是 **商品上架** 的核心逻辑，主要是将指定 `spuId` 对应的商品数据构建为 Elasticsearch 可检索的数据模型，并远程调用 `search` 服务将数据保存到 ES 中，实现商品的“上架”。
+
+```text
+前端点击【商品上架】 -> 后端 spu 上架接口（商品服务）
+   |
+   |-- 查询 SPU 和所有 SKU 信息（从商品库查）
+   |-- 查询库存信息（调用 ware 库存服务）
+   |-- 查询商品属性（用于 ES 检索）
+   |-- 封装成 ES 需要的结构（如 SkuEsModel）
+   |-- 通过远程调用发送给 search 服务
+         |
+         |-- 调用 Elasticsearch API（Bulk 保存）
+         |-- 成功返回后修改 spu 状态为“已上架”
+```
+
+1. 获取可搜索的规格属性
+
+   `List<ProductAttrValueEntity> baseAttrs = productAttrValueService.baseAttrListForSpu(spuId);`
+
+2. 查询当前 SPU 对应的所有 SKU
+
+   `List<SkuInfoEntity> skuInfos = skuInfoService.getSkuBySpuId(spuId);`
+
+   一个 SPU 可能有多个 SKU（不同颜色、内存等）。每个 SKU 都需要被单独上架到 ES 中。
+
+3. 查询库存信息（通过远程调用 ware 仓储服务）
+
+   `wareFeignService.getSkusHasStock(skuIds);`
+
+   通过调用仓库服务，查询每个 SKU 是否有库存。
+
+   有库存就可以正常上架，没库存可能要标记为不可售
+
+4.  构造 ES 上架模型 SkuEsModel
+
+   ```java
+   skuInfos.stream().map(skuInfo -> {
+       SkuEsModel skuEsModel = new SkuEsModel();
+       // 设置价格、图片、库存、品牌名、分类名、搜索属性
+   }).toList();
+   ```
+
+   每个 SKU 构建一个 `SkuEsModel` 对象，包含：
+
+   - 价格、默认图、库存（从库存服务中获取）
+   - 所属品牌名、分类名（从数据库中查出）
+   - 检索属性（用于支持搜索过滤）
+
+5. 调用 search 模块（gulimall-search）将数据存入 Elasticsearch
+
+   `searchFeignService.productStatusUp(upProducts);`
+
+   最终将准备好的 `SkuEsModel` 列表通过 Feign 调用 search 服务
+
+   最终将准备好的 `SkuEsModel` 列表通过 Feign 调用 search 服务
+
+6. 修改当前 SPU 的状态为“上架”
+
+这里还有几个细节，首先是要包装成一个事务或者TCC，第二热度评分score还没接入，默认为0
+
+### 为什么要存入ES呢？
+
+- 商品检索系统对**多条件查询（关键词 + 属性筛选 + 价格范围等）**要求高；
+- Elasticsearch 是专门为这种场景设计的搜索引擎，能实现复杂查询、高亮、权重排序、聚合等。
+
+数据库做这些查询效率非常低，而 ES 是为此场景优化的。
+
+经典数据库结构
+
+```lua
+spu_info          -- 商品基本信息
+sku_info          -- 商品具体规格（一个 SPU 对应多个 SKU）
+sku_images        -- 商品图片
+sku_sale_attr     -- 销售属性（如颜色、尺寸）
+attr              -- 检索属性（如 CPU、内存等）
+ware_sku          -- 库存信息（来自库存服务）
+```
+
+当用户搜索时，比如说：
+
+> "显示颜色是红色、8GB 内存、价格小于 5000 的手机"
+
+这需要：
+
+- 多表连接（JOIN），涉及 5~7 张表；
+- 属性字段是动态的（属性值是表驱动的）；
+- 属性是横向扩展的（不同类目属性不同）；
+- 多个条件组合（价格范围 + 分类 + 品牌 + 属性 + 关键字）；
+- 查询后还要分页、高亮、聚合统计（如价格区间、品牌筛选器）；
+
+JOIN 多了性能急剧下降
+
+动态列支持差（SQL 表结构是固定的）
+
+排序、全文检索、高亮、聚合都不擅长
+
+查询时间随数据量线性增长
+
+难以支撑高并发（每次都查库）
+
+#### es
+
+* inversed index，快速找出集合求交集
+
+* ES 在写入（上架）时就把所有需要的信息提前整合好了，变成一个大的 JSON 文档，搜索的时候根本不需要 JOIN，查询只查一个扁平文档结构，非常快。
+
+* ES 会将多个条件组合成一个复合查询，一次完成，而不是每个条件都查询再求交集
+
+  * 举例，用户搜索：
+
+    ```text
+    关键字: "小米"
+    属性: 内存=8GB, 颜色=红色
+    价格: 3000~5000
+    ```
+
+    会构造一个复合 `bool` 查询：
+
+    ```json
+    {
+      "bool": {
+        "must": [
+          { "match": { "skuTitle": "小米" } }
+        ],
+        "filter": [
+          { "term": { "attrs.attrName": "内存", "attrs.attrValue": "8GB" }},
+          { "term": { "attrs.attrName": "颜色", "attrs.attrValue": "红色" }},
+          { "range": { "price": { "gte": 3000, "lte": 5000 } }}
+        ]
+      }
+    }
+    ```
+
+    所有这些条件会一次性下发到 ES，ES 通过内部倒排索引 + bitmap 快速筛选出符合条件的文档。
+
+* segment 缓存优化
+
+ES 使用 `bool query` 把多个子条件打包，Lucene 再用**跳表/跳跃列表 + 位图 bitmap** 加速并集/交集计算。
+
+> bitmap这里位图就是
+>
+> "红色" 对应的 bitmap:   10110000
+> "8GB"   对应的 bitmap:   10010010
+>
+> `"红色 AND 8GB"` 的交集 => 对两个 bitmap 做按位与（AND）
+>
+> 10010000，文档 0 和文档 2 命中。
+>
+> * 快速交并差运算：使用 CPU 指令一轮就能完成；
+>
+> * 空间占用小：压缩算法（如 RoaringBitmap）进一步节省空间；
+>
+> * 适合大量文档参与计算：尤其是 filter 查询（不参与打分）时，性能极高。
+>
+> 使用场景：当不需要参考score分数，直接bitmap加速过滤，DocIdSet （Lucene）
+
+### 关于查询
 
 ```java
 @Override
@@ -2157,7 +2328,7 @@ public List<SkuInfoEntity> getSkuBySpuId(Long spuId){
 
 Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体类中的 `skuId` 字段。MyBatis-Plus 会自动将它解析成数据库字段名，比如 `sku_id`
 
-### 注意 syntactic suger
+### 注意 RESTful syntactic suger
 
 看似请求或者查询的任务，实际上在 RESTful API 里，如果复杂的请求，一般放在body里
 
@@ -2193,4 +2364,6 @@ Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体�
 # 监控系统
 
 # 链路追踪
+
+# LLM搜索接入
 
