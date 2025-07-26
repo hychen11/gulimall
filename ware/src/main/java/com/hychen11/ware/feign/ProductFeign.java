@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * @author ：chenhaoyang
+ * @author ：hychen11
  * @Description:
  * @ClassName: productFeign
  * @date ：2025/7/20 18:04

@@ -3,7 +3,7 @@ package com.hychen11.common.to;
 import lombok.Data;
 
 /**
- * @author ：chenhaoyang
+ * @author ：hychen11
  * @Description:
  * @ClassName: SkuHasStockTo
  * @date ：2025/7/20 17:56

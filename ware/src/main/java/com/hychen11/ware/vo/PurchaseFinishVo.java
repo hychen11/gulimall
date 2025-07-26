@@ -6,7 +6,7 @@ import javax.validation.constraints.NotNull;
 import java.util.List;
 
 /**
- * @author ：chenhaoyang
+ * @author ：hychen11
  * @Description:
  * @ClassName: PurchaseFinishVo
  * @date ：2025/7/20 16:56

@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * @author ：chenhaoyang
+ * @author ：hychen11
  * @Description:
  * @ClassName: SkuReductionTo
  * @date ：2025/7/20 13:26

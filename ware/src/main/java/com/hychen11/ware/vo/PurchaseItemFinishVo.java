@@ -3,7 +3,7 @@ package com.hychen11.ware.vo;
 import lombok.Data;
 
 /**
- * @author ：chenhaoyang
+ * @author ：hychen11
  * @Description:
  * @ClassName: PurchaseItemFinishVo
  * @date ：2025/7/20 17:03

@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: search
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8849
+        username: nacos
+        password: "nacos"
+
+server:
+  port: 13000

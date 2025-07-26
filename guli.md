@@ -1803,6 +1803,8 @@ public interface CouponFeignService {
 
 # ES 
 
+kibana 访问 5601
+
 9300 tcp 废弃, 9200 http
 
 快速地储存、搜索和分析海量数据
@@ -1823,8 +1825,12 @@ elasticsearch：存储和检索数据
 
 kibana：可视化检索数据
 
-```shell
-docker pull docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+注意这里版本7.13.0是要和spring pom里的一致！这里springboot里也要写，此外切换版本的话要把原先的esdata里的数据删除，不然会不断重启
+
+```xml
+<java.version>17</java.version>
+<spring-cloud.version>2025.0.0</spring-cloud.version>
+<elasticsearch.version>7.17.16</elasticsearch.version>
 ```
 
 chmod权限是 owner，group，others
@@ -1834,14 +1840,15 @@ chmod权限是 owner，group，others
 -d后台运行，-it交互模式
 
 ```shell
-docker run --name es01 \
+docker pull docker.elastic.co/elasticsearch/elasticsearch:7.17.16
+docker run --name elasticsearch \
 -p 9200:9200 -p 9300:9300 \
 --restart=always \
 -e "discovery.type=single-node" \
 -e "xpack.security.enabled=false" \
 -e ES_JAVA_OPTS="-Xms512m -Xmx512m" \
 -v $PWD/esdata:/usr/share/elasticsearch/data \
--d docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+-d docker.elastic.co/elasticsearch/elasticsearch:7.17.16
 ```
 
 如果需要自动启动，docker run里加上 --restart = always
@@ -1870,7 +1877,7 @@ docker run --name es01 \
 ```
 
 ```shell
-docker pull docker.elastic.co/kibana/kibana:8.17.0
+docker pull docker.elastic.co/kibana/kibana:7.17.16
 
 docker run --name kibana \
 	--restart=always \
@@ -1878,7 +1885,7 @@ docker run --name kibana \
   -e SERVER_HOST=0.0.0.0 \
   -e XPACK_SECURITY_ENABLED=false \
   -p 5601:5601 \
-  -d docker.elastic.co/kibana/kibana:8.17.0
+  -d docker.elastic.co/kibana/kibana:7.17.16
 ```
 
 docker**等号两边不能有空格**，它会被当作无效参数
@@ -1899,7 +1906,242 @@ docker**等号两边不能有空格**，它会被当作无效参数
 
 查看所有索引 show databases;
 
+POST新增。如果不指定id，会自动生成id。指定id就会修改这个数据，并新增版本号；可以不指定id，不指定id时永远为创建，指定不存在的id为创建，指定存在的id为更新，而版本号会根据内容变没变而觉得版本号递增与否
 
+PUT可以新增也可以修改。PUT必须指定id；由于PUT需要指定id，我们一般用来做修改操作，不指定id会报错。必须指定id，版本号总会增加
+
+PUT类似于java里的map put，要指定key-value，POST类似于mysql的insert
+
+http://localhost:9200/customer/external/1
+
+从 Elasticsearch 7.x 开始就废弃了 `_type`（如 `external`）字段，以前是`/{index}/{type}/{id}`，现在是`/{index}/_doc/{id}`
+
+```json
+//指定，这里1就是类似主键，存在1号文档里
+PUT http://localhost:9200/customer/_doc/1
+{
+ "name":"John Doe"
+}
+
+//不指定
+POST http://localhost:9200/customer/_doc
+{
+ "name":"John Doe"
+}
+```
+
+如果失败的话检查一下是否成功分片，如果red表示可能满了
+
+这里更新状态位updated，新增状态是created
+
+只有 **if_seq_no` 和 `if_primary_term同时匹配**，Elasticsearch 才会执行更新，否则会返回 `409 Conflict`，类似于CAS
+
+`PUT http://localhost:9200/customer/_doc/1?if_seq_no=0&if_primary_term=1`这里更新的就是seq=1，term=1
+
+#### _update
+
+```json
+POST customer/_update/1/
+{
+    "doc":{
+        "name":"111"
+    }
+}
+//或者
+POST customer/_doc/1
+{
+    "doc":{
+        "name":"222"
+    }
+}
+//或者
+PUT customer/_doc/1
+{
+    "doc":{
+        "name":"222"
+    }
+}
+
+```
+
+带有update情况下，POST操作会对比源文档数据，如果相同文档version不增加
+
+PUT操作总会重新保存并增加version版本
+
+这里需要创建一个config类
+
+```java
+package com.hychen11.search.config;
+
+import org.apache.http.HttpHost;
+import org.elasticsearch.client.RequestOptions;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.RestHighLevelClient;
+
+/**
+ * @author ：chenhaoyang
+ * @Description:
+ * @ClassName: ElasticSearchConfig
+ * @date ：2025/7/20 22:29
+ */
+@Configuration
+public class ElasticSearchConfig {
+    private static final RequestOptions COMMON_OPTIONS;
+    static{
+        RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
+        COMMON_OPTIONS = builder.build();
+    }
+    @Bean
+    RestHighLevelClient esRestClient(){
+        RestHighLevelClient client = new RestHighLevelClient(
+                RestClient.builder(
+                        new HttpHost("localhost", 9200, "http")
+                )
+        );
+        return client;
+    }
+}
+```
+
+`HttpHost host = new HttpHost(ip,port,"http");`
+
+这行代码是用来 **表示一个 HTTP 服务的主机地址**，而不是直接创建连接。它常用于配置客户端（例如 Elasticsearch 客户端）时，指定要连接的服务地址。
+
+创建一个全局唯一、可复用的 Elasticsearch 请求配置 `COMMON_OPTIONS`，用于统一设置请求参数，提高代码复用性和一致性。
+
+```java
+SearchRequest request = new SearchRequest("products");
+SearchResponse response = client.search(request, COMMON_OPTIONS);
+```
+
+`@RequestParam` vs `@RequestBody`
+
+Param就是在Url里，URL 查询参数 或 表单参数
+
+Body就是在请求体（Body）中的 JSON/XML/等结构化数据，POST/PUT 等携带 JSON 的请求
+
+### 写入es
+
+Client.index?
+
+```java
+@Resource
+private RestHighLevelClient client;
+
+IndexRequest request = new IndexRequest("users"); // 目标索引名称
+request.id("1"); // 文档 ID，可选
+//request.source("userName","zhangsan","age",18,"gender","男");
+User user = new User();
+user.setAge(18);
+user.setGender("男");
+user.setUserName("祝");
+String userJSON = JSON.toJSONString(user);
+request.source(userJSON, XContentType.JSON);
+client.index(request, XContentType.JSON);); // 执行请求，JSON 字符串，最常用
+```
+
+### 测试检索es
+
+```json
+curl -X PUT "localhost:9200/bank" -H 'Content-Type: application/json' -d '{
+  "mappings": {
+    "properties": {
+      "account_number": { "type": "integer" },
+      "balance": { "type": "double" },
+      "firstname": { "type": "text" },
+      "lastname": { "type": "text" },
+      "age": { "type": "integer" },
+      "gender": { "type": "keyword" },
+      "address": { "type": "text" },
+      "employer": { "type": "text" },
+      "email": { "type": "keyword" },
+      "city": { "type": "text" },
+      "state": { "type": "keyword" }
+    }
+  }
+}'
+
+curl -X POST "localhost:9200/bank/_doc/1" -H 'Content-Type: application/json' -d '{
+  "account_number": 1,
+  "balance": 10000,
+  "firstname": "Jack",
+  "lastname": "Smith",
+  "age": 35,
+  "gender": "M",
+  "address": "123 mill road",
+  "employer": "ACME",
+  "email": "jack.smith@example.com",
+  "city": "Springfield",
+  "state": "CA"
+}'
+```
+
+```java
+//1. 创建检索请求
+SearchRequest searchRequest = new SearchRequest();
+//2. 指定索引，相当于SQL的SELECT * FROM bank WHERE ...
+searchRequest.indices("bank");
+//3. 指定检索条件DSL
+SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+//构造检索条件
+searchSourceBuilder.query(QueryBuilders.matchQuery("address", "mill"));
+//按照年龄值分布聚合
+TermsAggregationBuilder ageAgg = AggregationBuilders.terms("ageAgg").field("age").size(10);
+searchSourceBuilder.aggregation(ageAgg);
+//计算平均薪资聚合
+AvgAggregationBuilder balanceAvg = AggregationBuilders.avg("balanceAvg").field("balance");
+searchSourceBuilder.aggregation(balanceAvg);
+System.out.println("检索条件" + searchSourceBuilder);
+//        searchSourceBuilder.from();
+//        searchSourceBuilder.size();
+searchRequest.source(searchSourceBuilder);
+//4.执行检索
+SearchResponse response = client.search(searchRequest, ElasticSearchConfig.COMMON_OPTIONS);
+//5. 分析结果
+System.out.println(response);
+//获取所有查到的数据
+SearchHits hits = response.getHits();
+SearchHit[] searchHits = hits.getHits();
+for (SearchHit hit : searchHits) {
+    String index = hit.getIndex();
+    String sourceAsString = hit.getSourceAsString();
+    Account account = JSON.parseObject(sourceAsString, Account.class);
+    System.out.println(account);
+}
+```
+
+
+
+### Nginx docker 安装
+
+```shell
+mkdir -p mydata/nginx/{html,logs,conf,conf.d}
+
+
+# 启动容器，自动重启
+docker run -d --name nginx \
+--restart unless-stopped \
+--platform linux/arm64 \
+-p 80:80 \
+-v ~/mydata/nginx/html:/usr/share/nginx/html \
+-v ~/mydata/nginx/logs:/var/log/nginx \
+-v ~/mydata/nginx/conf/nginx.conf:/etc/nginx/nginx.conf \
+-v ~/mydata/nginx/conf.d:/etc/nginx/conf.d \
+nginx:1.25
+```
+
+将ES所需资源放到Nginx中
+
+在html文件夹下新建es文件夹
+
+进入es，新建`fenci.txt`并进行编辑
+
+在`fenci.txt`中输入希望识别的单词后Esc，`:wq`保存
+
+页面访问测试
 
 # 商品上架 
 
