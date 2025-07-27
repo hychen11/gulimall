@@ -2113,34 +2113,6 @@ for (SearchHit hit : searchHits) {
 }
 ```
 
-### Nginx docker 安装
-
-```shell
-mkdir -p mydata/nginx/{html,logs,conf,conf.d}
-
-
-# 启动容器，自动重启
-docker run -d --name nginx \
---restart unless-stopped \
---platform linux/arm64 \
--p 80:80 \
--v ~/mydata/nginx/html:/usr/share/nginx/html \
--v ~/mydata/nginx/logs:/var/log/nginx \
--v ~/mydata/nginx/conf/nginx.conf:/etc/nginx/nginx.conf \
--v ~/mydata/nginx/conf.d:/etc/nginx/conf.d \
-nginx:1.25
-```
-
-将ES所需资源放到Nginx中
-
-在html文件夹下新建es文件夹
-
-进入es，新建`fenci.txt`并进行编辑
-
-在`fenci.txt`中输入希望识别的单词后Esc，`:wq`保存
-
-页面访问测试
-
 # 商品上架 
 
 在电商系统中，**商品上架**这个操作，**本质上就是将一个完整的 SPU（标准产品单元）及其相关的 SKU（库存单位）信息，整合后存储到 Elasticsearch（ES）中，以便支持商品检索功能**
@@ -2353,9 +2325,91 @@ Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体�
 
 # 性能压测
 
+### 优化的地方
+
+开启thymeleaf的缓存（这是因为如果不开缓存，每次加载页面时都需要重新加载进静态资源进行渲染）
+
+给常查询的数据库字段添加索引
+
+把日志级别修改成更高级即少打印日志信息（比如上线时改为error级别，只有在开发阶段才调到比较细的粒度级别）
+
+**动静分离**
+
+**修改JVM参数（-Xmx1024m -Xms1024m -Xmn512m）**，因为我们之前设置的**堆内存过小，会有大量的GC停顿时间**，并且可能会因为内存不够而爆OOM异常导致把服务挤掉线，所以需要把内存调大，以免出现内存溢出错误和频繁的进行GC（尤其是fullGC）
+
+优化业务代码（主要是我们操作数据库的代码）
+
+
+
 ### Jmeter
 
+中间件越多，性能损失越大，大多都损失在了网络交互
+
+性能测试主要关注如下指标：
+
+- QPS：每秒钟系统能够处理的**请求数**，越大表示系统越能支持高并发；
+- response time：服务处理一个请求的耗时，越短说明接口性能越好；
+- 错误率：一批请求中结果出错的请求所占比例；
+
+**TP Tail Percentile**，TP999就是尾部99.9%的响应时间
+
+### 压测OOM
+
+```java
+//TODO: 压力测试时，产生堆外内存异常：OutOfDirectMemoryError
+//1) springboot2.0默认使用lettuce作为操作redis的客户端，它使用netty进行网络通信
+//2) lettuce的bug导致netty堆外内存溢出 -Xmx300m: netty如果没有指定堆外内存，默认使用-Xmx300m
+//3) 可以通过 -Dio.netty.maxDirectMemory进行设置
+// 解决方案：不能使用-Dio.netty.maxDirectMemory只去调大堆外内存。
+// 1)、升级lettuce客户端
+// 2)、切换使用jedis
+```
+
+#### DirectMemory
+
+| 内存类型     | 说明                                                         |
+| ------------ | ------------------------------------------------------------ |
+| **堆内内存** | JVM 管理的内存区域，用于常规对象分配                         |
+| **堆外内存** | Java NIO/Netty 用来进行高速 I/O 操作，不受 GC 影响，性能更好 |
+
+堆外内存是通过 `ByteBuffer.allocateDirect()` 分配的，它不受 `-Xmx` 控制，而是受 `MaxDirectMemorySize` 限制：
+
+`-Dio.netty.maxDirectMemory=256m`
+
+如果你不设置，**Netty 默认用 `-Xmx` 作为堆外内存上限**
+
+Springboot2默认为Netty IO用的堆外内存如果连接池配得太大、连接频繁、返回数据量大，会频繁分配 DirectBuffer，没有限制好 DirectMemory 大小，最终就导致：OutOfDirectMemoryError
+
+老版本的 lettuce 的确在资源释放上存在 bug，**连接未及时释放导致堆外内存泄漏**，升级lettuce
+
+Jedis 是老牌 Redis 客户端，**阻塞式 IO（BIO）**，使用堆内内存，避免了 Netty/堆外的问题，不支持异步、性能略低于 lettuce
+
+### Nginx动静分离
+
+由于动态资源和静态资源目前都处于服务端，所以为了减轻服务器压力，我们将js、css、img 等静态资源放置在 Nginx 端，以减轻服务器压力。
+
+在 nginx 的 html 文件夹创建 staic 文件夹，并将 index/css 等静态资源全部上传到该文件夹中
+
+步骤①：修改index.html的静态资源路径，使其全部带有static前缀src="/static/index/img/img_09.png"
+
+步骤②：修改nginx的配置文件/mydata/nginx/conf/conf.d/kedamall.conf，若遇到有/static为前缀的请求，转发至 html 文件夹
+
 # 缓存+分布式锁
+
+哪些数据适合放入缓存？
+
+- 即时性、数据一致性要求不高的
+- 访问量大且更新频率不高的数据（读多、写少）
+
+**分布式锁解决 Cache BreakDown**
+
+**设置过期时间(随机)，解决缓存雪崩**
+
+**空值缓存或者bloom filter 解决Cache Penetration**
+
+Redis官方已经帮我们配置好了操作Redis的两种方式，`RedisTemplate<Object, Object> redisTemplate`, `StringRedisTemplate stringRedisTemplate`， 可以直接用StringRedisTemplate
+
+Redis的字符串**最大可以支持512M**的大小
 
 ```java
 /**
@@ -2390,7 +2444,7 @@ Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体�
 public class SpringCacheConfig {
 ```
 
-这里CacheProperties.class可以绑定application.yml的缓存配置
+这里CacheProperties.class可以绑定application.yml的缓存配置，配置ttl
 
 ```yaml
   cache:
@@ -2404,7 +2458,7 @@ public class SpringCacheConfig {
 
 cache-null-values true表示可以缓存null
 
-设置false的话不缓存null，避免缓存无效数据，减少缓存穿透的问题（需要你搭配布隆过滤器等方案使用）
+设置false的话不缓存null，避免缓存无效数据，减少缓存穿透的问题（需要你搭配**布隆过滤器**等方案使用）
 
 use-key-prefix 启用前缀
 
@@ -2491,7 +2545,7 @@ public List<CategoryEntity> getLevel1Categorys() {
 
 表示使用的缓存命名空间（或者说缓存前缀），相当于 Redis 的 key 前缀，所以存入的结构key就是category::level1Category1
 
-如果你希望根据不同参数生成不同 key
+如果你希望根据不同参数生成不同 key，默认ttl时间为-1，表示永不过期
 
 ```java
 @Cacheable(value = "category", key = "'level1Category:' + #parentId")
@@ -2524,7 +2578,7 @@ public void handle(String key) {
 }
 ```
 
-### RabbitMQ
+# RabbitMQ接入
 
 基于 **RabbitMQ + Spring Boot** 实现的 **消息驱动清缓存机制**
 
@@ -2593,7 +2647,9 @@ public void handleServiceA(String msg) {
 
 ### Redisson
 
-这里分布式锁实现通过redis去做的，这里就是多个服务去请求同一个redis，拿里面的key，redisson就是封装好了，有watch dog看门狗机制，锁延长机制，lua脚本保证原子性等机制
+这里分布式锁实现通过redis去做的，这里就是所有服务都去一个公共的地方抢锁，去请求同一个redis，拿里面的key，等待方式是自旋，就是性能不好
+
+redisson就是封装好了，有watch dog看门狗机制，锁延长机制，lua脚本保证原子性等机制
 
 > 多个服务节点，比如：
 >
@@ -2640,12 +2696,6 @@ synchronized public static void foo() {
 }
 ```
 
-
-
-
-
-
-
 ### Trick
 
 Java 在运行时会 **擦除泛型信息**，它们都会变成 `List`，丢失了 `String` 或 `Integer` 的类型信息
@@ -2657,17 +2707,136 @@ List<Integer> list2 = new ArrayList<>();
 
 `new TypeReference<>() {}` 是一个**匿名子类对象**
 
+```java
+// 如果是 Map<String, List<Catalog2Vo>> 序列化成的String
+Map<String, List<Catalog2Vo>> result = JSON.parseObject(collect,new TypeReference<Map<String, List<Catalog2Vo>>>(){});
+```
+
 这个匿名子类会**保留你写的泛型信息**，FastJSON 通过反射能拿到它
 
+# Nginx
+
+Ngnix在这个项目里的作用有两个，一个是动静分离，一个是负载均衡，反向代理到网关，再由网管转发请求到不同的服务
+
+### Nginx docker 安装
+
+```shell
+mkdir -p mydata/nginx/{html,logs,conf,conf.d}
 
 
-# 检索服务
+# 启动容器，自动重启
+docker run -d --name nginx \
+--restart unless-stopped \
+--platform linux/arm64 \
+-p 80:80 \
+-v ~/mydata/nginx/html:/usr/share/nginx/html \
+-v ~/mydata/nginx/logs:/var/log/nginx \
+-v ~/mydata/nginx/conf/nginx.conf:/etc/nginx/nginx.conf \
+-v ~/mydata/nginx/conf.d:/etc/nginx/conf.d \
+nginx:1.25
+```
 
-#  
+将ES所需资源放到Nginx中
+
+在html文件夹下新建es文件夹
+
+进入es，新建`fenci.txt`并进行编辑
+
+在`fenci.txt`中输入希望识别的单词后Esc，`:wq`保存
+
+页面访问测试
+
+这里前端的请求先访问 nginx，nginx转发到网管gateway，然后gateway再转发给相应的服务
+
+### 负载均衡
+
+#### Step1 
+
+修改`mydata/nginx/conf/nginx.conf`
+
+```
+    #gzip  on;
+    upstream mall{
+        server host.docker.internal:12000;
+    }
+    include /etc/nginx/conf.d/*.conf;
+```
+
+注意，这里nginx是在容器内，请求转发到nginx监听到80端口后，需要转发到宿主机的gateway的12000端口，需要是`host.docker.internal` 而不是`localhost`
+
+#### Step 2 
+
+修改`mydata/nginx/conf/conf.d/mall.conf`
+
+```
+server {
+    listen 80;
+    server_name mall.com *.mall.com;
+
+    location / {
+        proxy_pass http://mall;  # 88是宿主机网关端口        
+        proxy_set_header Host $host;  # 保留 host，方便 gateway 路由识别
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+监听外部请求 `mall.com` 和 `*.mall.com`，所有访问都会被 Nginx 接收后，**转发给 upstream mall**，并保留原始 Host 等信息。
+
+举个例子
+
+```
+GET /product/category/list/tree HTTP/1.1
+Host: mall.com
+```
+
+重新加载nginx配置
+
+`docker exec -it nginx nginx -s reload`
+
+#### Step 3
+
+这里需要在gateway的application.yml里配置负载均衡路由规则
+
+```
+        - id: search_route
+          uri: lb://search
+          predicates:
+            - Host=search.mall.com
+
+        - id: host_route
+          uri: lb://product
+          predicates:
+            - Host=mall.com
+```
+
+网关收到请求后，根据 Host 字段匹配对应的服务：
+
+- `search.mall.com` → 路由到 `search` 微服务
+- `mall.com` → 路由到 `product` 微服务
+
+整体流程如下所示
+
+```shell
+curl http://mall.com/product/category/list/tree
+#http 就是访问的80端口，转发http://mall，并且Host就是mall.com
+GET /product/category/list/tree HTTP/1.1
+Host: mall.com
+#转发到mall，这里mall是容器的nginx，转发到宿主机的localhost:12000，也就是gateway的监听端口
+#因为这里Host匹配mall.com， 因此路由规则匹配到lb://product 这个微服务
+#请求为/product/category/list/tree
+```
+
+注意，Host的路由规则要放最后，否则会优先进行Host匹配，导致其他路由规则失效
+
+# 检索
 
 # 异步 
 
 # 商品详情 
+
+# Seata分布式事务
 
 # 推荐系统
 
@@ -2675,5 +2844,5 @@ List<Integer> list2 = new ArrayList<>();
 
 # 链路追踪
 
-# LLM搜索接入
+# LLM搜索
 

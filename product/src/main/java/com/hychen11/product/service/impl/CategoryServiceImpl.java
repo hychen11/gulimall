@@ -136,6 +136,8 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryDao, CategoryEntity
      *
      * @return
      */
+
+//    TODO：bloom filter to handle Cache Penetration
     @Cacheable(value = {"category"}, key = "'level1Category1'")
     @Override
     public List<CategoryEntity> getLevel1Categorys() {
@@ -183,6 +185,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryDao, CategoryEntity
     /**
      * 从数据库查所有分类，并封装
      * 分布式锁 redisson redissonClient
+     * 分布式锁可以解决缓存击穿的问题！
      */
     public Map<String, List<Catalog2Vo>> getcatalogJsonFromDB() {
         //获取分布式锁,锁的粒度，越细越快

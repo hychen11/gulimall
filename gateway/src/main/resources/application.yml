@@ -29,18 +29,27 @@ spring:
             - RewritePath=/api/(?<segment>.*),/renren-fast/$\{segment}
 
         - id: member_route
-          uri: lb://gulimall-member
+          uri: lb://member
           predicates:
             - Path=/api/member/**
           filters:
             - RewritePath=/api/(?<segment>.*),/$\{segment}
 
         - id: ware_route
-          uri: lb://gulimall-ware
+          uri: lb://ware
           predicates:
             - Path=/api/ware/**
           filters:
             - RewritePath=/api/(?<segment>.*),/$\{segment}
 
+        - id: search_route
+          uri: lb://search
+          predicates:
+            - Host=search.mall.com
+
+        - id: host_route
+          uri: lb://product
+          predicates:
+            - Host=mall.com
 server:
   port: 12000
