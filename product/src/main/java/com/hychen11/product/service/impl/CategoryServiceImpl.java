@@ -8,6 +8,7 @@ import com.hychen11.product.vo.Catalog2Vo;
 import org.apache.commons.lang.StringUtils;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -46,9 +47,16 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryDao, CategoryEntity
     private RedissonClient redissonClient;
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     public CategoryServiceImpl(CategoryDao categoryDao) {
         this.categoryDao = categoryDao;
+    }
+
+
+    public void clearCache(String key) {
+        rabbitTemplate.convertAndSend("cache.clear.exchange", "cache.clear", key);
     }
 
     @Override
@@ -114,8 +122,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryDao, CategoryEntity
         if(!StringUtils.isEmpty(category.getName())){
             //更新categoryBrandRelation表的数据
             categoryBrandRelationService.updateCategory(category.getCatId(),category.getName());
-            //TODO：采用MQ decouple
-            redisTemplate.delete("catalogJsonFromDB");
+            clearCache("catalogJsonFromDB");
             //TODO:更新其他级联表
         }
     }

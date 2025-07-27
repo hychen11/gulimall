@@ -2580,6 +2580,45 @@ public void handle(String key) {
 
 # RabbitMQ接入
 
+### Rabbit 
+
+* 支持AMQP
+
+* 适用电商下单、库存锁定、支付确认、定时取消订单等强调可靠性和事务性的场景
+
+* 持久化机制完善，事务支持好，确认机制灵活（ACK/NACK、confirm）可靠性好
+
+### Kafka 
+
+* 适用于 高吞吐、日志、流式处理 场景
+
+* 单机百万级QPS不是问题，适合日志/埋点/行为流
+
+* Partition + Offset 模型，天然有顺序
+* ZooKeeper依赖（或KRaft），不适合轻量项目
+
+**Spring Boot 官方就强推 RabbitMQ**
+
+### Rabbit docker install
+
+```
+docker run -d --name rabbitmq \
+  --restart always \
+  -e RABBITMQ_DEFAULT_USER=guest \
+  -e RABBITMQ_DEFAULT_PASS=guest \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  rabbitmq:3-management
+```
+
+5672 应用程序通信端口
+
+15672 Web 管理界面端口
+
+用户名密码 guest / guest
+
+
+
 基于 **RabbitMQ + Spring Boot** 实现的 **消息驱动清缓存机制**
 
 这里的queues一旦有消息就自动触发执行，MessageListener
@@ -2593,7 +2632,7 @@ different with active polling (scheduled tasks), the event-driven approach is mo
 </dependency>
 ```
 
-application.yml
+`application.yml`
 
 ```
 spring:
@@ -2602,7 +2641,19 @@ spring:
     port: 5672
     username: guest
     password: guest
+    virtual-host: /
+    publisher-confirm-type: correlated  # 启用 confirm 回调
+    publisher-returns: true             # 启用 return 回调
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual        # 启用手动 ack
 ```
+
+`RabbitTemplate.ConfirmCallback` → 处理发送成功/失败。
+
+`RabbitTemplate.ReturnCallback` → 处理无队列接收的消息。
 
 ```java
 @Component
