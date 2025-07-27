@@ -2347,13 +2347,323 @@ Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体�
 @GetMapping("/hasStock")
 ```
 
+# thymeleaf
+
+暂时略过，HTML的
+
 # 性能压测
 
 ### Jmeter
 
-# 缓存 
+# 缓存+分布式锁
 
-# 检索服务 
+```java
+/**
+ * 6.整合redisson作为分布式锁等功能的框架
+ *  1）、引入依赖
+ *  2）、配置redisson
+ * 7.整合SpringCache简化缓存开发
+ *  1）、引入依赖
+ *  2）、写配置
+ *      (1)、自动配置了哪些
+ *          CacheAutoConfiguration会导入RedisCacheAutoConfiguration;
+ *          RedisCacheAutoConfiguration自动配好了RedisCacheManager;
+ *      (2)、配置使用redis作为缓存
+ * 3）、测试使用缓存
+ *      @Cacheable:触发将数据保存到缓存的操作
+ *      @CacheEvict:从缓存删除
+ *      @CachePut:不影响执行更新缓存
+ *      @Caching:组合以上多个操作
+ *      @CacheConfig:在类级别共享缓存的相同配置
+ * 4）、开启缓存功能    @EnableCaching
+ * 5）、CacheAutoConfiguration->RedisCacheConfiguration->
+ *      自动化配置了RedisCacheManager->初始化所有缓存->每个缓存觉得使用什么配置
+ *      ->如果redisCacheConfiguration有就用没有就用默认的->想改缓存的配置，只需要给容器中放一个
+ *      RedisCacheConfiguration即可->就会应用到当前RedisCacheManager管理的所有缓存分区中
+ */
+```
+
+```java
+@Configuration
+@EnableCaching
+@EnableConfigurationProperties(CacheProperties.class)
+public class SpringCacheConfig {
+```
+
+这里CacheProperties.class可以绑定application.yml的缓存配置
+
+```yaml
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      key-prefix: CACHE_
+      use-key-prefix: true
+      cache-null-values: true
+```
+
+cache-null-values true表示可以缓存null
+
+设置false的话不缓存null，避免缓存无效数据，减少缓存穿透的问题（需要你搭配布隆过滤器等方案使用）
+
+use-key-prefix 启用前缀
+
+```java
+@Configuration
+public class RedissonConfig {
+    @Bean(destroyMethod = "shutdown")
+    public RedissonClient redissonClient() {
+        //1.创建配置
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://localhost:6380");
+        //2.根据Config创建出RedissonClient实例
+        return Redisson.create(config);
+    }
+}
+```
+
+```java
+@Autowired
+private RedissonClient redissonClient;
+@Autowired
+private RedisTemplate<String, String> redisTemplate;
+```
+
+这里的RedisTemplate并不少从上面的SpringCacheConfig中来的，而是SpringBoot自动配置的，不用手动声明，前提引入了这个
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+引入这个后，Spring Boot 会在后台自动注册如下几个 Bean：
+
+- `RedisConnectionFactory`
+  - Spring 和 Redis 通信的「桥梁」，它负责建立、配置、和管理 Redis 客户端连接。
+- `StringRedisTemplate`
+- `RedisTemplate<Object, Object>`
+- `RedisTemplate<String, String>`（通常由你自定义或泛型推断）kv都是string，且使用的序列化器一般是 `StringRedisSerializer`
+
+如果是String，ZSet，Hash，Set等数据结构等话
+
+```java
+// String
+redisTemplate.opsForValue().set("user","zhangsan",5, TimeUnit.MINUTES);
+// 操作 Hash
+redisTemplate.opsForHash().put("user:1", "name", "zhangsan");
+// 操作 Set
+redisTemplate.opsForSet().add("tags", "java", "redis", "spring");
+// 操作 ZSet
+redisTemplate.opsForZSet().add("scores", "user1", 100.0);
+```
+
+每次查出变更后的分类名菜单结构，删除redis，清楚spring cache中的一级分类缓存，下一次请求会重新加载缓存，保证数据一致
+
+`redisTemplate.delete("catalogJsonFromDb");`
+
+这里是先更新再删除，会存在旧数据，
+
+**在数据库更新成功、但缓存尚未删除期间**，如果有并发请求，就可能读到旧数据，导致短暂的不一致。
+
+```java
+@CacheEvict(value = {"category"},key ="'level1Category1'")
+public void updateCascade(CategoryEntity category) {
+    redisTemplate.delete("catalogJsonFromDb");
+}
+```
+
+`@CacheEvict`这是 **Spring Cache 注解**，会在**方法执行成功后**，自动帮你清除一个叫 `category::level1Category1` 的缓存键。如果方法抛异常，缓存不会被清除，这里的category 相当于Mysql的表，level1Category1就是key
+
+这两个缓存的 key 不一样，一个是 `category::level1Category1`，另一个是 `catalogJsonFromDb`，各自服务于不同的功能逻辑。
+
+```java
+@Cacheable(value = {"category"},key ="'level1Category1'")
+public List<CategoryEntity> getLevel1Categorys() {
+    LambdaQueryWrapper<CategoryEntity> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(CategoryEntity::getParentCid, 0);
+    return categoryDao.selectList(wrapper);
+}
+```
+
+调用这个方法时，**先查缓存**是否有值，如果有，就**直接返回缓存值**，方法体不会执行；如果没有，才会执行方法，把返回结果缓存起来。
+
+表示使用的缓存命名空间（或者说缓存前缀），相当于 Redis 的 key 前缀，所以存入的结构key就是category::level1Category1
+
+如果你希望根据不同参数生成不同 key
+
+```java
+@Cacheable(value = "category", key = "'level1Category:' + #parentId")
+public List<CategoryEntity> getCategoryByParentId(Long parentId) {
+    ...
+}
+```
+
+### 缓存一致性
+
+采用rabbitMQ，这里改写完数据库，然后发送MQ，解耦
+
+**发消息清缓存 = 解耦、异步、可靠性更强、可扩展**
+
+**直接删缓存 = 同步、强耦合、可维护性差**
+
+强耦合：业务逻辑和缓存操作紧密绑在一起，并且缓存删除失败会影响业务
+
+```java
+// 1. 更新数据库
+categoryDao.updateById(category);
+
+// 2. 发送消息给 MQ（如 RabbitMQ, Kafka）
+mqTemplate.convertAndSend("cache.clear.topic", "catalogJsonFromDb");
+
+//然后你在另一个微服务/模块中监听消息：
+@RabbitListener(queues = "cache.clear.queue")
+public void handle(String key) {
+    redisTemplate.delete(key);
+}
+```
+
+### RabbitMQ
+
+基于 **RabbitMQ + Spring Boot** 实现的 **消息驱动清缓存机制**
+
+这里的queues一旦有消息就自动触发执行，MessageListener
+
+different with active polling (scheduled tasks), the event-driven approach is more efficient, real-time and decoupled
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-amqp</artifactId>
+</dependency>
+```
+
+application.yml
+
+```
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+```
+
+```java
+@Component
+public class CacheMessageListener {
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    @RabbitListener(queues = "cache.clear.queue")
+    public void handle(String key) {
+        redisTemplate.delete(key);
+    }
+}
+```
+
+```java
+@Autowired
+private RabbitTemplate rabbitTemplate;
+
+public void clearCache(String key) {
+    rabbitTemplate.convertAndSend("cache.clear.exchange", "cache.clear", key);
+}
+```
+
+- `rabbitTemplate` 是 Spring Boot 提供的用于操作 RabbitMQ 的工具类（类似于 KafkaTemplate、RedisTemplate）；
+- `convertAndSend()` 将数据“转换为消息对象”并“发送到指定交换机和路由键”。
+
+如果需要发布多个topic并且路由的话
+
+```java
+public void clearCache(String key) {
+    // 发送到不同 topic（routingKey）
+    rabbitTemplate.convertAndSend("gray.release.exchange", "gray.service.A", msgA);
+    rabbitTemplate.convertAndSend("gray.release.exchange", "gray.service.B", msgB);
+}
+
+@RabbitListener(queues = "gray.service.A.queue")
+public void handleServiceA(String msg) {
+    // A服务的处理逻辑
+}
+```
+
+### Redisson
+
+这里分布式锁实现通过redis去做的，这里就是多个服务去请求同一个redis，拿里面的key，redisson就是封装好了，有watch dog看门狗机制，锁延长机制，lua脚本保证原子性等机制
+
+> 多个服务节点，比如：
+>
+> - 服务 A、服务 B、服务 C
+> - 都想获取一个锁，比如 `lock:catalog:query`
+>
+> 服务 A 调用 `SET lockKey uuid NX PX 30000`
+>
+> Redis 如果 `lockKey` 不存在，就返回 OK，表示 A 拿到锁
+>
+> 如果 `lockKey` 已存在，B 和 C 拿不到锁，就去 **自旋/等待/失败**
+>
+> - Redis 是**高性能单线程**，`SETNX` 操作非常快，几微秒级
+> - 分布式锁不需要高频操作，**大多数业务并发量并不集中在锁上**
+
+```java
+RLock lock = redissonClient.getLock("lock:catalog:query");
+lock.lock(30, TimeUnit.SECONDS);
+try {
+    // 临界区逻辑
+} finally {
+    lock.unlock();
+}
+```
+
+对于本地或者单例来说，使用synchronized
+
+```java
+synchronized public Map<String, List<Catalog2Vo>> getCatalogJsonFromDbSynchronized() {}
+
+//等价于
+public Map<String, List<Catalog2Vo>> getCatalogJsonFromDbSynchronized() {
+    synchronized(this){}
+}
+```
+
+这里推荐第二种，因为锁的粒度小，更灵活
+
+如果你在**静态方法**中加 `synchronized`，那锁的是 **类对象 `.class`** 而不是实例 `this`
+
+```java
+synchronized public static void foo() {
+    // 锁的是 Xxx.class
+}
+```
+
+
+
+
+
+
+
+### Trick
+
+Java 在运行时会 **擦除泛型信息**，它们都会变成 `List`，丢失了 `String` 或 `Integer` 的类型信息
+
+```java
+List<String> list = new ArrayList<>();
+List<Integer> list2 = new ArrayList<>();
+```
+
+`new TypeReference<>() {}` 是一个**匿名子类对象**
+
+这个匿名子类会**保留你写的泛型信息**，FastJSON 通过反射能拿到它
+
+
+
+# 检索服务
+
+#  
 
 # 异步 
 

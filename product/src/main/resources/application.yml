@@ -15,6 +15,18 @@ spring:
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
 
+  redis:
+    host: localhost
+    #password: root@123456
+    port: 6380
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      key-prefix: CACHE_
+      use-key-prefix: true
+      cache-null-values: false
+
 mybatis-plus:
   mapper-locations: classpath:/mapper/**/*.xml
   global-config:
