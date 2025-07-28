@@ -2883,7 +2883,70 @@ Host: mall.com
 
 # 检索
 
+
+
 # 异步 
+
+### ThreadPool
+
+初始化线程的四种方式
+
+1、继承Thread类
+
+2、实现Runnable结构
+
+3、实现Callable接口+FutureTask，Callable支持泛型，泛型类型即返回结果类型。FutureTask的get()方法是阻塞等待当前线程任务执行完成，拿到返回值
+
+4、线程池，当前系统中线程池只能有一两个，异步任务交由线程池自己去选择线程执行
+
+创建线程池都用**ThreadPoolExecutor**
+
+这里采用两个Config文件去创建
+
+```java
+@Configuration
+public class ThreadPoolConfig {
+    @Resource
+    private ThreadPoolConfigProperties pool;
+    @Bean
+    public ThreadPoolExecutor threadPoolExecutor(){
+        return new ThreadPoolExecutor(pool.getCoreSize(),
+                pool.getMaxSize(),
+                pool.getKeepAliveTime(), TimeUnit.SECONDS,
+                new LinkedBlockingDeque<>(100000), Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.AbortPolicy());
+    }
+}
+```
+
+```java
+@ConfigurationProperties(prefix = "thread")
+@Data
+public class ThreadPoolConfigProperties {
+    private Integer coreSize;
+    private Integer maxSize;
+    private Integer keepAliveTime;
+}
+```
+
+注意这里ConfigurationProperties会读取`application.yml`
+
+```
+thread:
+  max-size: 200
+  core-size: 20
+  keep-alive-time: 10
+```
+
+但是这样不会被spring扫到，要么加@Component，要么在启动类上加
+
+```java
+@EnableConfigurationProperties(value = {ThreadPoolConfigProperties.class})
+```
+
+
+
+### CompletableFuture
 
 # 商品详情 
 

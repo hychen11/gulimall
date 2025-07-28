@@ -2,6 +2,7 @@ package com.hychen11.product.dao;
 
 import com.hychen11.product.entity.AttrEntity;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.hychen11.product.vo.SpuItemAttrGroupVo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,4 +19,6 @@ import java.util.List;
 public interface AttrDao extends BaseMapper<AttrEntity> {
 
     List<Long> selectSearchAttrIds(@Param("attrIds") List<Long> attrIds);
+
+    List<SpuItemAttrGroupVo> getAttrGroupWithAttrsBySpuId(@Param("spuId") Long spuId, @Param("catalogId") Long catalogId);
 }

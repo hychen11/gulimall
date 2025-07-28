@@ -6,6 +6,7 @@ import com.hychen11.product.dao.AttrDao;
 import com.hychen11.product.entity.AttrAttrgroupRelationEntity;
 import com.hychen11.product.entity.AttrEntity;
 import com.hychen11.product.vo.AttrGroupWithAttrsVo;
+import com.hychen11.product.vo.SpuItemAttrGroupVo;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +94,17 @@ public class AttrGroupServiceImpl extends ServiceImpl<AttrGroupDao, AttrGroupEnt
             return vos;
         }
         return null;
+    }
+
+    /**
+     * 用户端商品详情，根据spuId查询属性分组及其对应属性
+     * @param spuId
+     * @param catalogId
+     * @return
+     */
+    @Override
+    public List<SpuItemAttrGroupVo> getAttrGroupWithAttrsBySpuId(Long spuId, Long catalogId) {
+        return attrDao.getAttrGroupWithAttrsBySpuId(spuId,catalogId);
     }
 
 }

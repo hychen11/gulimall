@@ -51,3 +51,12 @@ mybatis-plus:
 
 server:
   port: 10000
+
+logging:
+  level:
+    com.hychen11: debug
+
+thread:
+  max-size: 200
+  core-size: 20
+  keep-alive-time: 10
