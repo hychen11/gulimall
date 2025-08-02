@@ -3084,6 +3084,8 @@ CompletableFuture.allOf(future2, future3, future4).get();
 
 # 认证服务
 
+### MD5
+
 ### 盐值加密是什么
 
 原始密码前后**添加一段随机数据（称为盐 Salt）**，再进行哈希计算，增强密码的安全性。
@@ -3207,6 +3209,101 @@ TTL: 1800
 
 - **商品库存、热销榜** → 用 `RedisTemplate` 操作缓存
 - **用户登录状态共享（单点登录）** → 用 `spring-session-data-redis` 自动存 session 到 Redis
+
+### Oauth2
+
+```css
+[用户] 
+   ↓ 授权
+[授权服务器]（GitHub）
+   ↓ 返回 code
+[客户端应用]（你的网站）
+   ↓ 换 token
+[授权服务器]
+   ↓ access_token
+[客户端]
+   ↓ 带 token 请求
+[资源服务器]（GitHub API）
+```
+
+#### step1
+
+`https://github.com/login/oauth/authorize?client_id=xxx&redirect_uri=xxx&scope=user`
+
+#### step2
+
+用户输入 GitHub 账号密码并点击「授权」
+
+#### step3
+
+GitHub 授权成功，跳回你的 redirect_uri
+
+`https://your-app.com/callback?code=abc123`
+
+这时你拿到了一个**授权码（Authorization Code）**
+
+#### step4
+
+客户端用授权码换取 access token
+
+你的服务器后台向 GitHub 发请求：
+
+```bash
+POST https://github.com/login/oauth/access_token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=xxx
+&client_secret=xxx
+&code=abc123
+&redirect_uri=xxx
+```
+
+GitHub 返回
+
+```json
+{
+  "access_token": "ya29.a0ARrdaM...",
+  "token_type": "Bearer",
+  "scope": "user"
+}
+```
+
+#### Step5
+
+客户端拿 access token 去访问用户资源
+
+用 token 请求资源服务器（GitHub API）：
+
+```bash
+GET https://api.github.com/user
+Authorization: Bearer ya29.a0ARrdaM...
+```
+
+### 重定向
+
+首先有一个RedirectAttributes关于重定向的，还能带参数跳转的的工具类
+
+第一种跳转回暴露参数
+
+```java
+redirectAttributes.addAttributie("prama1",value1);
+redirectAttributes.addAttributie("prama2",value2);
+return "redirect:/path/list"
+```
+
+同于 `return "redirect:/path/list?prama1=value1&prama2=value2"` ，注意这种方法直接将传递的参数暴露在链接地址上，非常的不安全，慎用
+
+第二种跳转比较好，隐藏了参数，链接地址上不直接暴露，但是只能在重定向的“页面”获取参数值
+
+```java
+redirectAttributes.addFlashAttributie("prama1",value1);
+redirectAttributes.addFlashAttributie("prama2",value2);
+return "redirect:/path/list" 
+```
+
+原理就是参数**临时存入 session**，在重定向跳转后**自动提取到 Model 并删除**，实现一次性、不暴露 URL 的参数传递。
+
+而这个session是在服务器端的redis里，只要客户端session id没变，重定向的Controller 也能访问到这个session
 
 # 购物车服务
 

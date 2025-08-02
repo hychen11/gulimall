@@ -180,7 +180,7 @@ public class MallSearchServiceImpl implements MallSearchService {
                 //6.2取消了面包屑之后，要讲请求中的url里面的当前条件设置为空
                 //拿到所有查询条件，去掉当前。
                 String replace = replaceQueryString(param, attr,"attrs");
-                navVo.setLink("http://search.zxl1027.com/list.html?" + replace);
+                navVo.setLink("http://search.mall.com/list.html?" + replace);
                 return navVo;
             }).toList();
             result.setNavs(navVos);
@@ -199,7 +199,7 @@ public class MallSearchServiceImpl implements MallSearchService {
                 replace = replaceQueryString(param, String.valueOf(brand.getBrandId()),"brandId");
             }
             navVo.setNavValue(buffer.toString());
-            navVo.setLink("http://search.zxl1027.com/list.html"+replace);
+            navVo.setLink("http://search.mall.com/list.html"+replace);
             navs.add(navVo);
         }
 

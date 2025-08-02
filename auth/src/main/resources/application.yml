@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: auth
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8849
+        username: nacos
+        password: "nacos"
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+
+  redis:
+    host: localhost
+    port: 6380
+  session:
+    store-type: redis
+
+server:
+  port: 15000
+
+logging:
+  level:
+    com.hychen11: debug
+
+oauth2:
+  weibo:
+    client-id: ""
+    client-secret: ""
+    registered-redirect-uri: http://auth.mall.com/oauth2.0/weibo/success
+
+
+thread:
+  max-size: 200
+  core-size: 20
+  keep-alive-time: 10
