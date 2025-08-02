@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: cart
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8849
+        username: nacos
+        password: "nacos"
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+  session:
+    store-type: redis
+  redis:
+    host: localhost
+    port: 6380
+server:
+  port: 14000
+
+logging:
+  level:
+    com.hychen11: debug
+
+thread:
+  max-size: 200
+  core-size: 20
+  keep-alive-time: 10

@@ -9,6 +9,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 
 @EnableDiscoveryClient
 @SpringBootApplication
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableFeignClients(basePackages = "com.hychen11.product.feign")
 @EnableTransactionManagement
 @EnableCaching
+@EnableRedisHttpSession
 @EnableConfigurationProperties(value = {ThreadPoolConfigProperties.class})
 public class ProductApplication {
     public static void main(String[] args) {

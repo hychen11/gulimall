@@ -3,13 +3,17 @@ package com.hychen11.member.controller;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.hychen11.common.exception.ErrorCodeEnum;
+import com.hychen11.common.to.MemberRegisterTo;
+import com.hychen11.common.to.MemberTo;
+import com.hychen11.member.exception.PhoneExistException;
+import com.hychen11.member.exception.UserNameExistException;
 import com.hychen11.member.feign.CouponFeignService;
+import com.hychen11.member.vo.MemberLoginVo;
+import com.hychen11.member.vo.WeiboUserVo;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.member.entity.MemberEntity;
 import com.hychen11.member.service.MemberService;
@@ -33,6 +37,52 @@ public class MemberController {
 
     @Autowired
     CouponFeignService couponFeignService;
+
+    /**
+     * 社交账号登录注册
+     *
+     * @param weiboUser
+     * @return
+     */
+    @PostMapping("/oauth2/login")
+    public MemberTo oauthLogin(@RequestBody WeiboUserVo weiboUser) {
+        MemberEntity memberEntity = memberService.ouathLogin(weiboUser);
+        MemberTo memberTo = new MemberTo();
+        BeanUtils.copyProperties(memberEntity,memberTo);
+        return memberTo;
+    }
+
+
+    /**
+     * 用户端前端注册功能，远程调用
+     *
+     * @param registerTo
+     * @return
+     */
+    @PostMapping("/register")
+    public R register(@RequestBody MemberRegisterTo registerTo) {
+        try {
+            memberService.register(registerTo);
+        } catch (PhoneExistException e) {
+            return R.error(ErrorCodeEnum.PHONE_EXIST_EXCEPTION.getCode(), ErrorCodeEnum.PHONE_EXIST_EXCEPTION.getMessage());
+        } catch (UserNameExistException e) {
+            return R.error(ErrorCodeEnum.USER_EXIST_EXCEPTION.getCode(), ErrorCodeEnum.USER_EXIST_EXCEPTION.getMessage());
+        }
+
+        return R.ok();
+    }
+
+    @PostMapping("/login")
+    public R login(@RequestBody MemberLoginVo member) {
+        MemberEntity memberEntity = memberService.login(member);
+        if (memberEntity == null) {
+            return R.error(ErrorCodeEnum.ACCOUNT_PASSWORD_EXCEPTION.getCode(), ErrorCodeEnum.ACCOUNT_PASSWORD_EXCEPTION.getMessage());
+        }
+        MemberTo memberTo = new MemberTo();
+        BeanUtils.copyProperties(memberEntity,memberTo);
+        return R.ok().setData(memberTo);
+    }
+
 
     @RequestMapping("/coupons")
     public R test(){

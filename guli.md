@@ -2339,7 +2339,7 @@ Lambda 表达式，指定查询字段。这里指的是 `SkuInfoEntity` 实体�
 
 优化业务代码（主要是我们操作数据库的代码）
 
-
+这里-Xmx就是最大堆内存， -Xms初始化堆内存，-Xmn就是new generation年轻代内存
 
 ### Jmeter
 
@@ -2883,8 +2883,6 @@ Host: mall.com
 
 # 检索
 
-
-
 # 异步 
 
 ### ThreadPool
@@ -2944,11 +2942,357 @@ thread:
 @EnableConfigurationProperties(value = {ThreadPoolConfigProperties.class})
 ```
 
-
-
 ### CompletableFuture
 
+为什么需要异步编排呢？举个例子
+
+查询商品详情页的逻辑比较复杂，有些数据甚至涉及到了OpenFeign远程调用（极其花费时间），具体查询数据流程如下：
+
+1 获取sku的基本信息 0.5s
+
+2 获取sku的图片信息 0.5s
+
+3 获取sku的促销信息 1s
+
+4 获取spu的所有销售属性 1s
+
+5 获取规格参数组及组下的规格参数 1.5s
+
+6 spu详情 1s（以上所有时间只是用于描述问题）
+
+如果是单线程同步执行的话，访问我们的商品详情页需要足足5.5s。但是多线程下可能只需要1.5s即可
+
+**1、2、3可以异步完成，4、5、6依赖于1完成之后的结果，4、5、6又可以异步完成，所以我们需要使用CompletableFuture进行异步编排** 
+
+所以这里理论上最快就是0.5+1.5=2s就可以完成
+
+```java
+public class CompletableFuture<T> implements Future<T>, CompletionStage<T> 
+public interface Future<V> {
+public interface CompletionStage<T> {
+```
+
+Future里的Data，RealData，FutureData，Data接口表示对外数据，RealData表示真实的数据，FutureData作为RealData的代理，类似于一个订单/契约，通过FutureData，可以在将来获得RealData，因此**Future模式本质上是代理模式的一种实际应用**。
+
+`allof()`
+
+**如果你不等待这些任务完成（比如不调用 `allOf().get()` 或 `join()`），主线程可能提前结束**，从而导致子线程的执行中断或不完整
+
+```java
+CompletableFuture<Void> all = CompletableFuture.allOf(future1, future2, future3);
+all.get(); // 等待所有任务执行完
+```
+
+#### `thenApply`
+
+ 获取前面结果并返回新结果
+
+```java
+CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> 10)
+    .thenApply(result -> result * 2); // result 是 10，返回 20
+
+System.out.println(future.get()); // 输出 20
+```
+
+#### `thenAccept`
+
+消费前面结果，但不返回
+
+```java
+CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10)
+    .thenAccept(result -> System.out.println("处理结果：" + result));
+```
+
+#### `thenRun`
+
+不关心前面结果，纯粹执行一个操作
+
+```java
+CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10)
+    .thenRun(() -> System.out.println("前面的任务完成后，我执行"));
+```
+
+#### `Async`
+
+Async 方法默认使用 **`ForkJoinPool.commonPool()`** 线程池
+
+可自定义线程池传入
+
+```java
+.thenApply(...)  //同步，也就是上一个线程结果我拿来执行，返回结果
+.thenAccept(...)  //同步，也就是上一个线程结果我拿来执行，不返回结果
+.thenRun(...)     //同步，也就是上一个线程完成，直接跑
+
+.thenApplyAsync(...)  //异步，也就是上一个线程结果提交线程池执行，返回结果
+//可以指定线程池 
+.thenApply(func, executor) 
+```
+
+#### `allOf`多个任务都完成才继续
+
+```java
+CompletableFuture<Void> all = CompletableFuture.allOf(future1, future2, future3);
+all.thenRun(() -> System.out.println("全部完成"));
+```
+
+#### `anyOf`任意一个完成就继续
+
+```java
+CompletableFuture<Object> any = CompletableFuture.anyOf(future1, future2, future3);
+any.thenAccept(result -> System.out.println("最快的返回了：" + result));
+```
+
+#### 创建异步对象
+
+````java
+public static CompletableFuture<Void> runAsync(Runnable runnable)
+public static CompletableFuture<Void> runAsync(Runnable runnable, Executor executor)
+public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier)
+public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier, Executor executor)
+````
+
+- runAsync方法不支持返回值。
+- supplyAsync可以支持返回值，使用fet获取返回结果
+
+#### 计算结果完成时的回调方法
+
+通过调用的whenComplete方法和exceptionally方法执行特定的Action
+
+- whenComplete：是执行当前任务的线程执行继续执行 whenComplete 的任务。
+- whenCompleteAsync：是把whenCompleteAsync这个任务执行提交给线程池来进行执行
+- **方法不以 Async 结尾，意味着 Action 使用相同的线程执行，而 Async 可能会使用其他线程 执行（如果是使用相同的线程池，也可能会被同一个线程选中执行)**
+
+这里举一个例子，这里executor是线程池，是异步任务的实际执行者
+
+```java
+@Autowired
+private ThreadPoolExecutor executor;
+
+CompletableFuture<Entity1> future1 = CompletableFuture.supplyAsync(()->{return service1.query(id1);},executor);
+
+CompletableFuture<Void> future2 = future1.thenAcceptAsync((res)->{service2.query(res)},executor);
+
+CompletableFuture<Void> future3 = future1.thenAcceptAsync((res)->{service3.query(res)},executor);
+
+CompletableFuture<Void> future4 = CompletableFuture.runAsync(() -> {...}, executor);
+
+//注意这里不需要future1，因为future2和3只有在future1执行完后才执行！
+CompletableFuture.allOf(future2, future3, future4).get();
+```
+
 # 商品详情 
+
+# 认证服务
+
+### 盐值加密是什么
+
+原始密码前后**添加一段随机数据（称为盐 Salt）**，再进行哈希计算，增强密码的安全性。
+
+* 防止彩虹表攻击（Rainbow Table）攻击者可以提前预计算大量常见密码的哈希值（如“123456”的 MD5 是 `e10adc...`），然后反查匹配
+
+* 提高相同密码的差异性
+
+MD5(Salt + password)
+
+SHA256(password + Salt)
+
+```java
+BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+memberEntity.setPassword(passwordEncoder.encode(password));
+```
+
+这里string是包含salt+password的，有具体格式的
+
+`$<version>$<cost>$<22字符salt><31字符hash>`
+
+### JWT
+
+客户端登录后，服务端生成一个 Token（比如 JWT），返回给客户端
+
+客户端每次请求都携带这个 Token（一般放在 HTTP Header 中）
+
+服务端通过 Token 来解析用户身份（不再依赖 Session 或 Redis）
+
+### ThreadLocal
+
+不适合直接做认证，但可以做上下文透传（ThreadLocal 是线程隔离的）
+
+可以存JWT解析后的用户信息，可以用来区分购物车等，也可以避免重复解析JWT
+
+### OAuth2
+
+第三方授权登录
+
+多用于微信/微博/Google 等授权场景
+
+### Session
+
+**Session** 是一种在服务端保存用户状态的数据机制，用于“识别当前访问用户”
+
+1. 用户首次访问，服务端生成 `sessionId` 和用户信息（放在服务器内存或 Redis 中）。
+2. `sessionId` 被写入 cookie 发送给浏览器。
+3. 用户再次访问时，浏览器带着这个 `sessionId`，服务端找到对应的用户信息 → 知道你是谁。
+
+`session.store-type: redis` 就是Session数据存在redis里，而不是存在默认内存Tomcat Session
+
+这个其实也可以通过JWT token来解决？
+
+### 为什么用 Redis 存储 Session?
+
+**多台服务器共享 Session**：集群部署时，多个节点共享登录状态。
+
+**避免 Tomcat 内存撑爆**：不再保存在本地服务器内存。
+
+**Session 自动过期清理**：Redis 可配置 TTL
+
+### SessionConfig
+
+```java
+//配置 CookieSerializer（修改 cookie 的属性）
+@Bean
+public CookieSerializer cookieSerializer() {
+    DefaultCookieSerializer cookieSerializer = new DefaultCookieSerializer();
+    cookieSerializer.setDomainName("mall.com");
+    cookieSerializer.setCookieName("SESSION");
+    return cookieSerializer;
+}
+//设置 Session 序列化器（FastJson）
+@Bean
+public RedisSerializer<Object> springSessionDefaultRedisSerializer() {
+    return new GenericFastJsonRedisSerializer();
+}
+```
+
+设置 cookie 的 **域名**，实现子域名共享登录状态
+
+RedisSerializer是session存redis时候序列化反序列化的
+
+CookieSerializer是设置cookie搁置的，是否base64 编码，Cookie 的 **domain**、**path**，是否启用 `HttpOnly`、`Secure`
+
+然后这里后台管理，前台商店，移动端都可以共享登陆状态，多个微服务可以通过redis共享登陆状态
+
+redis里的Session存储结构
+
+```JSON
+key: spring:session:sessions:<sessionId>
+value: {
+    "user": {
+        "id": 1001,
+        "nickname": "chy"
+    },
+    ...
+}
+TTL: 1800
+```
+
+关于这里的缓存
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-redis</artifactId>
+
+</dependency>
+<dependency>
+    <groupId>org.springframework.session</groupId>
+    <artifactId>spring-session-data-redis</artifactId>
+</dependency>
+```
+
+这里groupId类似不同的命名空间，而artifactId就是组件的id
+
+这里都是redis服务，但是是不同模块的，上面就是缓存，`redisTemplate.opsForValue().set(a,b)`
+
+下面是session里`session.setAttribute("user", xxx)` 自动放进redis里
+
+- **商品库存、热销榜** → 用 `RedisTemplate` 操作缓存
+- **用户登录状态共享（单点登录）** → 用 `spring-session-data-redis` 自动存 session 到 Redis
+
+# 购物车服务
+
+购物车是读多写多，不适合数据库，但是又要持久化，所以使用Redis，默认开启RDB，AOF是默认不开的
+
+购物车用hash结构存储
+
+```java
+Map<k1,Map<k2,CartItemInfo>> 
+//k1 each user
+//k2 each id
+```
+
+### 身份鉴别
+
+cookie存储user-key，临时用户会有一个user-key的 Cookie 临时标识，过期时间为一个月
+
+手动清除`user-key`，那么临时购物车的购物项也被清除，所以`user-key`是用来标识和存储临时购物车数据的
+
+ThreadLocal
+
+先通过 Session 信息判断是否登录，并分别进行用户身份信息的封装，并把`user-key`放在 Cookie 中
+
+这个功能使用`拦截器`进行完成
+
+```text
+[1] --> preHandle() 拦截器前置方法
+       |
+[2] --> Controller 方法执行
+       |
+[3] --> postHandle() 拦截器后置方法
+```
+
+```java
+/**
+  查看request里的session有没有
+    没有表示用户没登陆
+    从cookie里取一个user-key，然后封装成userInfoTo
+    如果没有user-key就新建一个，UUID.randomUUID().toString()
+  
+  	有表示用户已经登陆，使用member.getId()作为userId，有userId表示已登陆，没有就是临时用户，用user-key识别
+*/
+
+public static ThreadLocal<UserInfoTo> threadlocal - new ThreadLocal<>();
+
+@Override
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    HttpSession session = request.getSession();
+    MemberTo member = (MemberTo) session.getAttribute(AuthServerConstant.LOGIN_USER);
+    UserInfoTo userInfo = new UserInfoTo();
+    if (member == null) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                String cookieName = cookie.getName();
+                if (cookieName.equals(CartConstant.TEMP_USER_COOKIE_NAME)) {
+                    userInfo.setUserKey(cookie.getValue());
+                }
+            }
+            if (userInfo.getUserKey() == null) {
+                String userKey = UUID.randomUUID().toString().replace("_", "");
+                userInfo.setUserKey(userKey);
+                Cookie cookie1 = new Cookie(CartConstant.TEMP_USER_COOKIE_NAME, userKey);
+                cookie1.setDomain("mall.com");
+                cookie1.setMaxAge(CartConstant.TEMP_USER_COOKIE_TIMEOUT);
+                response.addCookie(cookie1);
+            }
+        }
+    } else {
+        userInfo.setUserId(member.getId());
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                String cookieName = cookie.getName();
+                if (cookieName.equals(CartConstant.TEMP_USER_COOKIE_NAME)) {
+                    userInfo.setUserKey(cookie.getValue());
+                }
+            }
+        }
+    }
+    threadLocal.set(userInfo);
+    return true;
+}
+```
+
+TODO: 这里可以用JWT改造，无状态
 
 # Seata分布式事务
 
@@ -2960,3 +3304,71 @@ thread:
 
 # LLM搜索
 
+# 加密算法
+
+### HS256 对称加密
+
+```
+Signature = HMAC-SHA256(
+  base64UrlEncode(header) + "." + base64UrlEncode(payload),
+  secret_key
+)
+```
+
+HMAC(K, M) = H((K ⊕ opad) || H((K ⊕ ipad) || M))
+
+- `K` 是密钥（secret key）；
+- `M` 是消息（message）；
+- `H` 是哈希函数（如 SHA-256）；
+- `opad` 是外部填充（0x5c重复）；
+- `ipad` 是内部填充（0x36重复）；
+- `⊕` 是按位异或（XOR）；
+
+1. 对密钥进行两次变换（内填充+外填充）；
+2. 内层：先用 `(K ⊕ ipad)` 拼接消息 M，进行一次 SHA256；
+3. 外层：再用 `(K ⊕ opad)` 拼接上述结果，进行第二次 SHA256；
+4. 最终输出就是 HMAC-SHA256 的值。
+
+### SHA256 
+
+普通hash，把任意长度的输入，映射为固定长度（256位）的输出
+
+SHA256(secret + message)
+
+- 把原始消息填充到满足 **长度 ≡ 448 mod 512**；
+- 然后附上 64 位的原消息长度；
+- 最终消息长度变为 **512 的倍数**。
+
+### Base64
+
+只是一个编码算法，不是加密算法！就是吧二进制变成ASCII字符串
+
+把24位2进制变为4组6位的ASCII码
+
+# 问题
+
+### 公司用的Thrift而不是OpenFeign
+
+**OpenFeign** 是一个 HTTP Client 工具，封装了 RESTful 调用过程，底层使用 Ribbon/RestTemplate/OkHttp/HttpClient
+
+性能较差（HTTP + JSON），延迟高
+
+不适合大批量数据通信
+
+Thrift 性能好，二进制+TCP+紧凑型数据结构，占用网络资源少，非常适合高频 RPC，语言友好
+
+# Future Work
+
+将OpenFeign迁移至性能更好的Thrift
+
+JWT改造session
+
+服务端存储会话数据（登录状态、用户信息）客户端仅存 `Session ID`
+
+**所有信息存储在客户端 token 中**，服务端只做验证，不存状态
+
+JWT payload 可以自定义内容，扩展性好
+
+前后端完全分离
+
+无状态，支持分布式，不依赖服务端存储：用户信息、权限等编码在 token 中

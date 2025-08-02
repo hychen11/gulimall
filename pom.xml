@@ -17,6 +17,8 @@
 
     <modules>
         <module>common</module>
+        <module>cart</module>
+        <module>auth</module>
         <module>coupon</module>
         <module>member</module>
         <module>order</module>

@@ -51,5 +51,14 @@ spring:
           uri: lb://product
           predicates:
             - Host=mall.com
+
+        - id: cart_route
+          uri: lb://cart
+          predicates:
+            - Host=cart.mall.com
+        - id: auth_route
+          uri: lb://auth-server
+          predicates:
+            - Host=auth.mall.com
 server:
   port: 12000
