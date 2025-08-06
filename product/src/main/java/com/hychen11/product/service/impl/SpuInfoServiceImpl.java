@@ -7,9 +7,7 @@ import com.hychen11.common.to.SkuReductionTo;
 import com.hychen11.common.to.SpuBoundTo;
 import com.hychen11.common.to.es.SkuEsModel;
 import com.hychen11.common.utils.R;
-import com.hychen11.product.dao.BrandDao;
-import com.hychen11.product.dao.CategoryDao;
-import com.hychen11.product.dao.SpuInfoDescDao;
+import com.hychen11.product.dao.*;
 import com.hychen11.product.entity.*;
 import com.hychen11.product.feign.CouponFeignService;
 import com.hychen11.product.feign.SearchFeignService;
@@ -31,7 +29,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hychen11.common.utils.PageUtils;
 import com.hychen11.common.utils.Query;
 
-import com.hychen11.product.dao.SpuInfoDao;
 import org.springframework.transaction.annotation.Transactional;
 
 
@@ -63,7 +60,8 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
     private BrandDao brandDao;
     @Autowired
     private CategoryDao categoryDao;
-
+    @Autowired
+    private SkuInfoDao skuInfoDao;
     /**
      * 条件查询
      *
@@ -282,5 +280,14 @@ public class SpuInfoServiceImpl extends ServiceImpl<SpuInfoDao, SpuInfoEntity> i
             //远程调用失败
             //TODO: 重复调用问题？接口幂等性；重试机制
         }
+    }
+
+    @Override
+    public SpuInfoEntity getSpuInfoBySkuId(Long skuId) {
+        SkuInfoEntity skuInfoEntity = skuInfoDao.selectOne(new LambdaQueryWrapper<SkuInfoEntity>()
+                .eq(SkuInfoEntity::getSkuId, skuId));
+        Long spuId = skuInfoEntity.getSpuId();
+        return spuInfoDao.selectOne(new LambdaQueryWrapper<SpuInfoEntity>()
+                .eq(SpuInfoEntity::getId, spuId));
     }
 }

@@ -2,8 +2,12 @@ package com.hychen11.ware.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.hychen11.common.to.SkuHasStockTo;
+import com.hychen11.common.to.OrderTo;
 import com.hychen11.common.utils.PageUtils;
+import com.hychen11.ware.entity.WareOrderTaskDetailEntity;
+import com.hychen11.ware.entity.WareOrderTaskEntity;
 import com.hychen11.ware.entity.WareSkuEntity;
+import com.hychen11.ware.vo.WareSkuLockVo;
 
 import java.util.List;
 import java.util.Map;
@@ -26,5 +30,9 @@ public interface WareSkuService extends IService<WareSkuEntity> {
     List<SkuHasStockTo> getSkusHasStock(List<Long> skuIds);
 
     boolean hasStockBySkuId(Long skuId);
+
+    Boolean orderLockStock(WareSkuLockVo vo);
+
+    void unlockStock(WareOrderTaskDetailEntity taskDetailEntity);
 }
 

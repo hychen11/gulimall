@@ -3,6 +3,7 @@ package com.hychen11.cart.service;
 import com.hychen11.cart.vo.Cart;
 import com.hychen11.cart.vo.CartItem;
 
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -25,4 +26,6 @@ public interface CartService {
     void countItem(Long skuId, Integer num);
 
     void deleteItem(Long skuId);
+
+    List<CartItem> getCurrentUserCartItems();
 }

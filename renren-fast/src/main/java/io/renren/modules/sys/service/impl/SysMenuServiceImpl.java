@@ -18,6 +18,7 @@ import io.renren.modules.sys.entity.SysMenuEntity;
 import io.renren.modules.sys.service.SysMenuService;
 import io.renren.modules.sys.service.SysRoleMenuService;
 import io.renren.modules.sys.service.SysUserService;
+import org.apache.shiro.util.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -77,7 +78,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuDao, SysMenuEntity> i
 	private List<SysMenuEntity> getMenuList(List<Long> menuIdList) {
 		// 查询拥有的所有菜单
 		List<SysMenuEntity> menus = this.baseMapper.selectList(new QueryWrapper<SysMenuEntity>()
-				.in(Objects.nonNull(menuIdList), "menu_id", menuIdList).in("type", 0, 1));
+				.in(!CollectionUtils.isEmpty(menuIdList), "menu_id", menuIdList).in("type", 0, 1));
 		//查询完成 对此list直接排序
 		Collections.sort(menus);
 

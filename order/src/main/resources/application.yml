@@ -13,6 +13,32 @@ spring:
   application:
     name: order
 
+  redis:
+    host: localhost
+    port: 6380
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+  session:
+    store-type: redis
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    publisher-confirm-type: correlated  # 启用 confirm 回调
+    publisher-returns: true             # 启用 return 回调
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual        # 启用手动 ack
+
+  mvc:
+    format:
+      date-time: yyyy-MM-dd HH:mm:ss
+
 mybatis-plus:
   mapper-locations: classpath:/mapper/**/*.xml
   global-config:
@@ -21,3 +47,12 @@ mybatis-plus:
 
 server:
   port: 9000
+
+logging:
+  level:
+    com.hychen11: debug
+
+thread:
+  core-size: 20
+  max-size: 200
+  keep-alive-time: 10

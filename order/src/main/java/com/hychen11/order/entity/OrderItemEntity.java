@@ -25,10 +25,10 @@ public class OrderItemEntity implements Serializable {
 	 */
 	@TableId
 	private Long id;
-	/**
-	 * order_id
-	 */
-	private Long orderId;
+//	/**
+//	 * order_id
+//	 */
+//	private Long orderId;
 	/**
 	 * order_sn
 	 */

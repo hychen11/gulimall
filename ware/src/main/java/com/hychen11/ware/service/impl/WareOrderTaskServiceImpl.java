@@ -1,5 +1,7 @@
 package com.hychen11.ware.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.Map;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -15,6 +17,8 @@ import com.hychen11.ware.service.WareOrderTaskService;
 
 @Service("wareOrderTaskService")
 public class WareOrderTaskServiceImpl extends ServiceImpl<WareOrderTaskDao, WareOrderTaskEntity> implements WareOrderTaskService {
+    @Autowired
+    private WareOrderTaskDao wareOrderTaskDao;
 
     @Override
     public PageUtils queryPage(Map<String, Object> params) {
@@ -26,4 +30,14 @@ public class WareOrderTaskServiceImpl extends ServiceImpl<WareOrderTaskDao, Ware
         return new PageUtils(page);
     }
 
+    /**
+     * 根据orderSn查询
+     * @param orderSn
+     * @return
+     */
+    @Override
+    public WareOrderTaskEntity getOrderTaskByOrderSn(String orderSn) {
+        return wareOrderTaskDao.selectOne(new LambdaQueryWrapper<WareOrderTaskEntity>()
+                .eq(WareOrderTaskEntity::getOrderSn, orderSn));
+    }
 }

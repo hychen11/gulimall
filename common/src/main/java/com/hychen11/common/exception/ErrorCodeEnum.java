@@ -16,7 +16,9 @@ public enum ErrorCodeEnum {
     USER_EXIST_EXCEPTION(15001,"用户名已经存在"),
     PHONE_EXIST_EXCEPTION(15002,"手机号已经存在"),
     ACCOUNT_PASSWORD_EXCEPTION(15003,"账号或密码错误"),
-    PRODUCT_UP_EXCEPTION(11000,"商品上架异常");
+    PRODUCT_UP_EXCEPTION(11000,"商品上架异常"),
+    NO_STOCK_EXCEPTION(21000,"商品库存不足");
+
     private final Integer code;
     private final String message;
     ErrorCodeEnum(Integer code,String message){

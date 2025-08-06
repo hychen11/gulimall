@@ -48,6 +48,9 @@ public class Cart {
         BigDecimal amount = new BigDecimal("0");
         if(items!=null && !items.isEmpty()){
             for (CartItem item : items) {
+                if(!item.isCheck()){
+                    continue; //如果没有选中，则不计算总价
+                }
                 amount = amount.add(item.getTotalPrice());
             }
         }

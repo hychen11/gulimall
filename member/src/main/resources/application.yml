@@ -10,6 +10,14 @@ spring:
         server-addr: localhost:8849
         username: nacos
         password: "nacos"
+    redis:
+      host: localhost
+      port: 6380
+    session:
+      store-type: redis
+    jackson:
+      date-format: yyyy-MM-dd HH:mm:ss
+
   application:
     name: member
 
@@ -21,3 +29,8 @@ mybatis-plus:
 
 server:
   port: 8000
+
+thread:
+  core-size: 20
+  max-size: 200
+  keep-alive-time: 10

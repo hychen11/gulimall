@@ -60,5 +60,15 @@ spring:
           uri: lb://auth-server
           predicates:
             - Host=auth.mall.com
+
+        - id: member_route
+          uri: lb://mall-member
+          predicates:
+            - Host=member.mall.com
+
+        - id: order_route
+          uri: lb://mall-order
+          predicates:
+            - Host=order.mall.com
 server:
   port: 12000

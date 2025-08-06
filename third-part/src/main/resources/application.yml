@@ -10,3 +10,6 @@ spring:
 
 server:
   port: 16000
+
+#  String host = "https://gyytz.market.alicloudapi.com";
+#  String path = "/sms/smsSend";

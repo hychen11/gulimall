@@ -10,11 +10,7 @@ import com.hychen11.common.valid.UpdateStatusGroup;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.product.entity.BrandEntity;
 import com.hychen11.product.service.BrandService;
@@ -36,6 +32,16 @@ import javax.validation.Valid;
 public class BrandController {
     @Autowired
     private BrandService brandService;
+
+    /**
+     * 根据id查品牌名字
+     * @param brandId
+     * @return
+     */
+    @GetMapping("getBrandNameById/{brandId}")
+    public String getBrandNameById(@PathVariable Long brandId){
+        return brandService.getBrandNameById(brandId);
+    }
 
     /**
      * 列表

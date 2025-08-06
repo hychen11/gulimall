@@ -60,4 +60,11 @@ public class BrandServiceImpl extends ServiceImpl<BrandDao, BrandEntity> impleme
         wrapper.in(BrandEntity::getBrandId,brandIds);
         return brandDao.selectList(wrapper);
     }
+
+    @Override
+    public String getBrandNameById(Long brandId) {
+        BrandEntity brandEntity = brandDao.selectOne(new LambdaQueryWrapper<BrandEntity>()
+                .eq(BrandEntity::getBrandId, brandId));
+        return brandEntity.getName();
+    }
 }

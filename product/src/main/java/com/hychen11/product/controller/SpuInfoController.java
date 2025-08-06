@@ -27,6 +27,17 @@ public class SpuInfoController {
     @Autowired
     private SpuInfoService spuInfoService;
 
+
+    /**
+     * 远程调用，根据skuId查询spu信息
+     * @param skuId
+     * @return
+     */
+    @GetMapping("/getSpuInfoBySkuId/{skuId}")
+    public SpuInfoEntity getSpuInfoBySkuId(@PathVariable Long skuId){
+        return spuInfoService.getSpuInfoBySkuId(skuId);
+    }
+
     /**
      * 列表
      */

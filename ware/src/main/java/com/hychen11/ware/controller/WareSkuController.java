@@ -4,7 +4,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import com.hychen11.common.exception.ErrorCodeEnum;
+import com.hychen11.common.exception.NoStockException;
 import com.hychen11.common.to.SkuHasStockTo;
+import com.hychen11.ware.vo.WareSkuLockVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +30,22 @@ import com.hychen11.common.utils.R;
 public class WareSkuController {
     @Autowired
     private WareSkuService wareSkuService;
+
+    /**
+     * 锁定库存
+     *
+     * @param vo
+     * @return
+     */
+    @PostMapping("/lock/order")
+    public R orderLockStock(@RequestBody WareSkuLockVo vo) {
+        try {
+            Boolean result = wareSkuService.orderLockStock(vo);
+            return R.ok().setData(result);
+        } catch (NoStockException e) {
+            return R.error(ErrorCodeEnum.NO_STOCK_EXCEPTION.getCode(), ErrorCodeEnum.NO_STOCK_EXCEPTION.getMessage());
+        }
+    }
 
     /**
      * 列表

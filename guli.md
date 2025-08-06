@@ -3212,6 +3212,12 @@ TTL: 1800
 
 ### Oauth2
 
+https://developers.weixin.qq.com/doc/oplatform/Mobile_App/WeChat_Login/Development_Guide.html
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/3b3dffa72b5f4df39278a74b19492e40.png)
+
+微信登录
+
 ```css
 [用户] 
    ↓ 授权
@@ -3305,6 +3311,89 @@ return "redirect:/path/list"
 
 而这个session是在服务器端的redis里，只要客户端session id没变，重定向的Controller 也能访问到这个session
 
+### TODO spring session不共享不同步
+
+session不可跨域，它有自己的作用范围，在`auth.mall.com`中保存session，但是网址跳转到`mall.com`中，取不出`auth.mall.com`中保存的session
+
+同一个服务，复制多份，session不同步问题
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/7cbecff5edf2183fa0cee6a21552cec7.png)
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/6508fd2bf6f78f76691c5a177f0bd703.png)
+
+解决方案使用redis统一存储
+
+Session 跨域（`auth.mall.com` → `mall.com`）不可见，解决方案：设置 Cookie 的 `Domain` 属性为主域
+
+```yml
+server:
+  servlet:
+    session:
+      cookie:
+        domain: mall.com
+```
+
+这样，`mall.com` 和 `auth.mall.com` 下的所有请求都会带上这个 sessionId
+
+使用 Redis 存储 Session，所有服务节点访问同一个 Redis，Session 共享问题就解决了。
+
+### sso单点登录 single sign-on
+
+上面解决了同域名的session问题，但如果`taobao.com`和`tianmao.com`这种不同的域名也想共享session呢？
+
+最终解决方案：都去中央认证器
+
+spring session已经解决不了不同域名的问题了。无法扩大域名
+
+**一个公共的登陆点server，他登录了代表这个集团的产品就登录过了**
+
+
+
+以两个系统为例：`auth.mall.com`（认证中心） 和 `mall.com`（业务系统）：
+
+1. **用户访问业务系统**（例如 mall.com）；
+2. mall.com 发现用户未登录，**重定向到认证中心**（auth.mall.com）；
+3. 认证中心展示登录页面，用户输入账号密码；
+4. 验证成功后，认证中心：
+   - 设置一个认证域的 `Cookie`（例如 `SSO_TOKEN`，设置在 `*.mall.com` 下）；
+   - **生成一个授权码 code 或 token**；
+   - **重定向回业务系统**，并附带这个授权码 `code`（或 token）；
+5. 业务系统拿着 `code` 访问认证中心的一个接口 `/oauth/token`，换取用户信息；
+6. 业务系统将用户信息保存到自己的 `session` 或 `jwt` 中；
+7. 后续用户再访问其他业务系统（如 `cart.mall.com`），会自动带上 `SSO_TOKEN`，可以自动免登录。
+
+
+
+#### 实现方法
+
+##### 基于 Cookie + Session（适合子域名），不同domain不能共享
+
+- 认证中心设置 `domain=.mall.com` 的 Cookie（如 `sso_token`）；
+- 所有子系统可以读取这个 cookie；
+- 子系统根据 cookie 向认证中心查询用户信息（token 交换）
+
+
+
+##### 基于 OAuth2.0 协议
+
+- 各系统以第三方客户端身份接入认证中心（如 GitHub 登录）；
+- 使用授权码模式（Authorization Code）：
+  1. 获取 code；
+  2. 用 code 换 token；
+  3. 用 token 换用户信息；
+
+适用于第三方登录、不同主域名下的系统，不依赖 Cookie。
+
+我个人的理解就是 OAuth 是一种请求“第三方认证中心”的 SSO
+
+
+
+##### 基于 JWT + 网关转发
+
+- 用户登录后获取 JWT；
+- 请求业务系统时携带 JWT（一般放在请求头 Authorization）；
+- 业务系统或网关解析 JWT 校验身份，无需会话状态（Stateless）；
+
 # 购物车服务
 
 购物车是读多写多，不适合数据库，但是又要持久化，所以使用Redis，默认开启RDB，AOF是默认不开的
@@ -3317,7 +3406,76 @@ Map<k1,Map<k2,CartItemInfo>>
 //k2 each id
 ```
 
+这里如何用redis存储呢？
+
+```
+Redis Key → 表名
+Field（哈希键） → 主键 / 行的标识
+Value（哈希值） → 行的数据（通常是对象的 JSON 字符串）
+```
+
+举个例子
+
+```
+// 相当于一个用户一个购物车，一个数据库
+cartKey = CartConstant.CART_PREFIX + userInfo.getUserKey();
+// 取一整个数据库
+BoundHashOperations<String, Object, Object> cartOps = redisTemplate.boundHashOps(cartKey);
+// 这里取cartOps.values()进行反序列化，这里的key 就是 sku.toString(); 就如同上面写的，key是sku_id，所以这个本质上就是一个Map套Map的结构
+```
+
+```
+Redis Hash: cart:user:123
+
+Field             | Value
+------------------|------------------------------
+"sku_1001"        | {"skuId":1001, "count":2}
+"sku_1002"        | {"skuId":1002, "count":1}
+```
+
+### 什么时候更新价格
+
+**注意，每次获取购物车的时候需要更新一下价格（也就是再查询一下！）**
+
+用户在页面加载购物车列表 更新
+
+用户下单结算 更新
+
+用户删除购物项 不用
+
+用户只是加购、没查看购物车 可以先不更新，延迟更新
+
+后台运营改了价格 价格是动态变动的
+
+### 高并发场景下实时更新价格
+
+**每次读取购物车都远程调用商品服务（RPC 或 HTTP 调用）**，可能导致：
+
+- 响应延迟大（网络+序列化+反序列化）；
+- 高并发下商品服务被打爆；
+- 增加整体系统复杂性和失败概率（例如超时、降级、重试）。
+
+**价格变动频繁，但购物车读操作频繁**：如果每次都查当前价格，会导致大量不必要的重复调用
+
+方案一：下单时再更新价格（延迟校验）
+
+方案二：批量查询价格，合并调用
+
+因为当前是`cartItems.stream().map(item -> productFeignService.infoBySkuId(...))`是调用N次，可以合并成一个List合并调用
+
+方案三：价格推送 (适用于大促场景或价格更新频率高的系统)
+
+商品服务发 Kafka 消息通知价格变更
+
+购物车服务收到后异步更新 Redis 缓存中的价格
+
+读取购物车时从 Redis 里取价格，避免频繁远程调用
+
 ### 身份鉴别
+
+通过拦截器的threadlocal去取UserInfo，里面包含userId（optional）和user-key
+
+`UserInfoTo userInfo = CartInterceptor.threadLocal.get();`
 
 cookie存储user-key，临时用户会有一个user-key的 Cookie 临时标识，过期时间为一个月
 
@@ -3389,9 +3547,247 @@ public boolean preHandle(HttpServletRequest request, HttpServletResponse respons
 }
 ```
 
+简单说一下这里的逻辑，就是看session里的login user字段有没有，没有新用户就用user-key，UUID随机一个，有就绑定user-key和userId
+
+此外存在分布式session的问题，这里可以直接引入redis解决
+
+```xml
+<dependency>
+    <groupId>org.springframework.session</groupId>
+    <artifactId>spring-session-data-redis</artifactId>
+</dependency>
+```
+
+```yml
+spring:
+  session:
+    store-type: redis
+```
+
+配置 Cookie 的跨域或路径（如果有子域名问题）
+
+```java
+@Configuration
+public class SessionConfig {
+    /**
+     * 配置session的domain,由默认的子域名设置为父域名
+     * @return
+     */
+    @Bean
+    public CookieSerializer cookieSerializer(){
+        DefaultCookieSerializer cookieSerializer = new DefaultCookieSerializer();
+        cookieSerializer.setDomainName("mall.com");
+        cookieSerializer.setCookieName("SESSION");
+        return cookieSerializer;
+    }
+    @Bean
+    public RedisSerializer<Object> springSessionDefaultRedisSerializer(){
+        return new GenericFastJsonRedisSerializer();
+    }
+}
+```
+
+会自动将 HttpSession 存入 Redis
+
+一旦配置好了，Spring Boot 会自动将用户的 `HttpSession`（如登录态）存储在 Redis 中。多个服务实例之间可以共享这个状态，从而解决 **分布式 session 不一致** 的问题
+
+用户访问 A 服务实例，登录后生成的 `JSESSIONID` 保存在浏览器的 Cookie 中。
+
+这个 Session 被序列化存入 Redis。
+
+用户访问 B 服务实例，带着同一个 Cookie，B 实例就会去 Redis 中读取 session。
+
 TODO: 这里可以用JWT改造，无状态
 
+# MQ
+
+引入消息队列的原因就是对我们的页面相应速度再优化
+
+有几个好处，异步处理，解耦，流量控制，流量削峰
+
+消息队列主要有两种形式的目的地
+
+- **队列（queue）：** 点对点消息通信（point-to-point）
+- **主题（topic）：** 发布（publish）/订阅（subscribe）消息通信
+
+RabbitMQ是AMQP，**Exchange 类型**，fanout广播发到 fanout 类型交换器的消息都会分到所有绑定的队列上去
+
+```
+# 开启发送端确认
+spring.rabbitmq.publisher-confirms=true
+
+# 开启发送端消息抵达队列的确认
+spring.rabbitmq.publisher-returns=true
+
+# 只要抵达队列，以异步发送优先回调 publisher-returns
+spring.rabbitmq.template.mandatory=true
+
+# 手动ack消息
+spring.rabbitmq.listener.simple.acknowledge-mode=manual
+```
+
+- 消息处理成功，ack()，接受下一条消息，此消息broker就会移除
+- 消息处理失败，nack()/reject() 重新发送给其他人进行处理，或者容错处理后ack
+
+# 库存
+
+**库存系统**在电商平台中属于“高并发、高一致性要求”
+
+**锁库存、解锁库存机制**，是整个下单-支付流程中防止超卖（卖出超过库存）最关键的一环
+
+* 避免超卖（不能卖比库存多的商品）
+
+* 快速响应高并发下单请求
+
+* 自动清理因异常导致的“僵尸锁库存”
+
+* 保证和订单状态一致性
+
+### Lock Stock
+
+用户下单时，系统暂时“预占用”库存（不减掉，只锁定），确保其他用户不能同时购买这部分库存
+
+```
+[用户下单]
+     ↓
+[订单服务创建订单]
+     ↓
+[调用库存服务锁库存]
+     ↓
+[库存服务锁定库存成功，返回成功]
+     ↓
+[订单服务继续处理（如生成订单号、发送MQ）]
+     ↓
+[用户支付]
+     ↓
+[支付成功 → 扣减库存]
+```
+
+### Unlock Stock
+
+如果订单后续取消/支付失败/异常等，系统需要将锁定的库存还原（释放）
+
+* 订单取消（用户主动或系统定时取消）
+  * 下单成功 → 锁库存成功 → 用户未支付 → 超时取消订单（或手动取消） → 解锁库存
+  * 解锁触发方式：
+    - 订单服务监听定时任务或消息队列，发送“解锁库存”事件；
+    - 库存服务消费消息，执行解锁逻辑。
+* 业务失败，订单回滚
+  * 下单请求中，订单服务创建订单成功 → 锁库存成功 → 下游服务（如扣减余额）失败 → 事务回滚
+  * 虽然订单失败，但**库存已经锁定了**，如果不主动释放库存，就变成“库存被锁住但没人买”，最终导致**“假性售罄”**。
+
+简化版的表设计
+
+```
+product_sku_stock{
+	sku_id,
+	stock_total,
+	stock_locked//已经锁定的库存
+}
+//锁库存
+if (stock_total - stock_locked >= 购买数量) {
+    stock_locked += 购买数量
+}
+//支付成功
+stock_total -= 购买数量
+stock_locked -= 购买数量
+//订单取消
+stock_locked -= 购买数量
+```
+
+| 问题         | 建议方案                                       |
+| ------------ | ---------------------------------------------- |
+| 高并发抢库存 | Redis + Lua 脚本原子操作锁库存                 |
+| 保证一致性   | 分布式事务 / 可靠消息服务（RocketMQ）          |
+| 防止锁死库存 | 设置库存锁定的过期时间 + 解锁消息              |
+| 异步解锁库存 | 用消息队列处理订单状态变更，库存服务监听并解锁 |
+| 热点商品     | 使用缓存/预减库存 + 后台同步数据库             |
+
+### Deduce Stock
+
+用户支付成功后，才真正从库存中减掉
+
+### 结合 MQ 的库存解锁设计（推荐）
+
+假设你用了 RocketMQ：
+
+- 用户下单后，库存服务锁库存成功；
+- 同时订单服务发送一个**延时消息**（比如30分钟后触发）；
+- 延时消息的消费者是库存服务；
+- 库存服务收到延时消息后去查询订单状态：
+  - 如果订单已支付 → 不处理；
+  - 如果订单已取消或不存在 → 解锁库存。
+
+ 自动清理超时订单的锁库存。
+
+# 订单
+
+注意，关于redis序列化，如果用的默认的序列化器，JdkSerializationRedisSerializer，需要`implements Serializable`，不推荐
+
+而`Jackson2JsonRedisSerializer` 不需要，推荐，将对象转成 JSON
+
+```java
+/**
+ * 1.引入RabbitMQ
+ *      1).引入amqp场景:RabbitAutoConfiguration就会自动生效
+ *      2).给容器中自动配置了 RabbitTemplate,AmqpAdmin,CachingConnectionFactory,RabbitMessagingTemplate
+ *      所有属性都是spring.rabbitmq   @ConfigurationProperties(prefix="spring.rabbitmq")
+ *      3).给配置文件配置spring.rabbitmq信息
+ *      4).@EnableRabbit
+ *      5).监听消息:@RabbitListener 必须有@EnableRabbit
+ *          @RabbitListener:标在类或者方法上(监听哪些队列)
+ *          @RabbitHandler:标在方法上(重载不同的消息类型)
+ *
+ * @RabbitListener(queues = {"hello-java-queue"})，要声明的方法必须在容器中
+ * queues:声明需要监听的队列
+ * @param message：原生消息详细信息（头+体）
+ * @param orderEntity T<发送消息的类型>spring会自动转换
+ * @param channel：是个接口 获取当前传输数据的通道
+ * Queue:可以很多人都来监听，只要收到消息，队列删除消息，而且只能有一个收到此消息
+ *      场景：
+ *            1):订单服务启动多个，同一个消息，只能有一个客户端收到
+ *            2):只要一个消息完全处理完，方法运行结束，我们就可以接收到下一个消息
+ * @RabbitListener(queues = {"hello-java-queue"})
+ * public void receiveMessage(Message message, OrderEntity orderEntity,Channel channel){}
+ *
+ *2.本地事务失效问题：
+ *      同一个对象内事务方法互相调用默认失效，因为绕过了代理对象
+ *      事务通过使用代理对象来控制
+ *      解决：
+ *          使用代理对象来调用事务方法
+ *              1）引入aop
+ *              2）@EnableAspectJAutoProxy(exposeProxy)
+ *              3）本类互调调用对象
+ *3.Seata控制分布式事务
+ *      1）导入依赖
+ *      2）启动seata服务器
+ *
+ */
+```
+
+
+
 # Seata分布式事务
+
+### 为什么要代理数据源？
+
+在一个分布式系统中，比如你调用了：
+
+- 用户服务 → 下订单；
+- 商品服务 → 扣库存；
+- 账户服务 → 扣余额；
+
+这些服务可能访问各自的数据库，但你希望这三个操作**要么全部成功，要么全部失败**，这就需要 **全局事务（Global Transaction）**，而 Seata 就是为这种需求设计的中间件。
+
+要实现这个目标，Seata 需要：
+
+1. 拦截你对数据库的操作；
+2. 在执行 SQL 时插入一些“事务钩子”；
+3. 当发生异常时能自动 **回滚** 所有参与服务的数据库操作。
+
+# 秒杀
+
+# 熔断限流
 
 # 推荐系统
 
@@ -3443,6 +3839,14 @@ SHA256(secret + message)
 把24位2进制变为4组6位的ASCII码
 
 # 问题
+
+extends RuntimeException，需要继承，而不是implements
+
+Lombok @Builder 默认生成的构造函数是 package-private（包访问权限）
+
+List，Set判空用`CollectionUtils.isEmpty`
+
+而对象等判空用`Objects.nonNull`
 
 ### 公司用的Thrift而不是OpenFeign
 

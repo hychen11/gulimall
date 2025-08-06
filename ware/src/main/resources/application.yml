@@ -14,6 +14,20 @@ spring:
     name: ware
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    publisher-confirm-type: correlated  # 启用 confirm 回调
+    publisher-returns: true             # 启用 return 回调
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual        # 启用手动 ack
+
 
 mybatis-plus:
   mapper-locations: classpath:/mapper/**/*.xml
