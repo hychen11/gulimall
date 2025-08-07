@@ -86,14 +86,15 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
         return new PageUtils(page);
     }
 
+    @Transactional
     @Override
-    public void addStock(WareSkuEntity wareSkuEntity){
+    public void addStock(WareSkuEntity wareSkuEntity) {
         //判断如果没有库存记录就是新增操作
         LambdaQueryWrapper<WareSkuEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(WareSkuEntity::getSkuId, wareSkuEntity.getSkuId());
         wrapper.eq(WareSkuEntity::getWareId, wareSkuEntity.getWareId());
         List<WareSkuEntity> wareSkuEntities = wareSkuDao.selectList(wrapper);
-        if (wareSkuEntities == null || wareSkuEntities.isEmpty()) {
+        if (!CollectionUtils.isEmpty(wareSkuEntities)) {
             wareSkuEntity.setStockLocked(0);
             //远程查询sku的名字
             try {
@@ -102,7 +103,7 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
                     wareSkuEntity.setSkuName(skuInfoTo.getSkuName());
                 }
             } catch (Exception e) {
-
+                log.error("完成采购添加库存功能出现异常:"+e.getMessage(),e);
             }
             wareSkuDao.insert(wareSkuEntity);
         } else {
@@ -117,7 +118,7 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
      * @return
      */
     @Override
-    public List<SkuHasStockTo> getSkusHasStock(List<Long> skuIds){
+    public List<SkuHasStockTo> getSkusHasStock(List<Long> skuIds) {
         List<SkuHasStockTo> tos = skuIds.stream().map(skuId -> {
             SkuHasStockTo skuHasStockTo = new SkuHasStockTo();
             Long stock = wareSkuDao.getSkuStock(skuId);
@@ -141,11 +142,11 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
 
     /**
      * 锁库存
-     *
+     * <p>
      * 库存解锁场景：
-     *  1）、下单成功，订单过期没有支付被系统自动取消、被用户手动取消。
-     *  2）、下订单成功，库存锁定成功，接下来业务失败，导致订单回滚
-     *          之前锁定的库存要自动解锁。
+     * 1）、下单成功，订单过期没有支付被系统自动取消、被用户手动取消。
+     * 2）、下订单成功，库存锁定成功，接下来业务失败，导致订单回滚
+     * 之前锁定的库存要自动解锁。
      *
      * @param vo
      * @return
@@ -190,12 +191,12 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
                     BeanUtils.copyProperties(stockDetail, stockDetailTo);
                     //防止回滚以后找不到数据
                     stockLockedTo.setTaskDetail(stockDetailTo);
-                    rabbitTemplate.convertAndSend("stock-event-exchange", "stock.locked",stockLockedTo);
+                    rabbitTemplate.convertAndSend("stock-event-exchange", "stock.locked", stockLockedTo);
                     break;
                 }
                 // 仓库锁失败，尝试下一个仓库
             }
-            if(!skuStocked){
+            if (!skuStocked) {
                 //当前商品所有仓库都没有锁住
                 throw new NoStockException(skuId);
             }
@@ -249,6 +250,7 @@ public class WareSkuServiceImpl extends ServiceImpl<WareSkuDao, WareSkuEntity> i
         }
     }
 
+    @Transactional
     @Override
     public void unlockStock(WareOrderTaskDetailEntity taskDetailEntity) {
         Long skuId = taskDetailEntity.getSkuId();
