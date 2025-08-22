@@ -1,0 +1,26 @@
+package com.hychen11.order.config;
+
+import com.hychen11.order.interceptor.LoginUserInterceptor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import javax.annotation.Resource;
+
+/**
+ * @author ：hychen11
+ * @Description:
+ * @ClassName: WebMvcConfig
+ * @date ：2025/8/14 22:35
+ */
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+    @Resource
+    private LoginUserInterceptor loginUserInterceptor;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(loginUserInterceptor)
+                .addPathPatterns("/**");
+    }
+}

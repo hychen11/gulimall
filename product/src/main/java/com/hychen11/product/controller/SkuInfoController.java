@@ -6,11 +6,7 @@ import java.util.Map;
 import com.hychen11.common.to.SkuInfoTo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.product.entity.SkuInfoEntity;
 import com.hychen11.product.service.SkuInfoService;
@@ -23,7 +19,7 @@ import com.hychen11.common.utils.R;
  * sku信息
  *
  * @author hychen11
- * @email 
+ * @email
  * @date 2025-02-10 15:49:12
  */
 @RestController

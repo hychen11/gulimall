@@ -20,6 +20,7 @@
         <module>cart</module>
         <module>auth</module>
         <module>third-part</module>
+        <module>seckill</module>
         <module>coupon</module>
         <module>member</module>
         <module>order</module>

@@ -22,8 +22,8 @@ public class SessionConfig {
     @Bean
     public CookieSerializer cookieSerializer(){
         DefaultCookieSerializer cookieSerializer = new DefaultCookieSerializer();
-        cookieSerializer.setDomainName("zxl1027.com");
-        cookieSerializer.setCookieName("ZXL_SESSION");
+        cookieSerializer.setDomainName("mall.com");
+        cookieSerializer.setCookieName("SESSION");
         return cookieSerializer;
     }
     @Bean

@@ -1,8 +1,10 @@
 spring:
   cloud:
     nacos:
+      config:
+        server-addr: localhost:8848
       discovery:
-        server-addr: localhost:8849
+        server-addr: localhost:8848
     gateway:
       routes:
         - id: test_route
@@ -42,6 +44,13 @@ spring:
           filters:
             - RewritePath=/api/(?<segment>.*),/$\{segment}
 
+        - id: coupon_route
+          uri: lb://coupon
+          predicates:
+            - Path=/api/coupon/**
+          filters:
+            - RewritePath=/api/(?<segment>.*),/$\{segment}
+
         - id: search_route
           uri: lb://search
           predicates:
@@ -56,19 +65,28 @@ spring:
           uri: lb://cart
           predicates:
             - Host=cart.mall.com
+
         - id: auth_route
           uri: lb://auth-server
           predicates:
             - Host=auth.mall.com
 
         - id: member_route
-          uri: lb://mall-member
+          uri: lb://member
           predicates:
             - Host=member.mall.com
 
         - id: order_route
-          uri: lb://mall-order
+          uri: lb://order
           predicates:
             - Host=order.mall.com
+
+
+
+        - id: seckill_route
+          uri: lb://seckill
+          predicates:
+            - Host=seckill.mall.com
+            -
 server:
   port: 12000

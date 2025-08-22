@@ -6,10 +6,10 @@ spring:
     password: "0602"
   cloud:
     nacos:
+      config:
+        server-addr: localhost:8848
       discovery:
-        server-addr: localhost:8849
-        username: nacos
-        password: "nacos"
+        server-addr: localhost:8848
   application:
     name: product
   jackson:

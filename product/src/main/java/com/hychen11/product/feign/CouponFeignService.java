@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * @ClassName: CouponFeignService
  * @date ：2025/7/20 14:31
  */
-@FeignClient(name = "coupon")
+@FeignClient("coupon")
 public interface CouponFeignService {
 
     @PostMapping("coupon/spubounds/save")

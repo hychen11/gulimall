@@ -14,7 +14,7 @@ import java.util.Map;
  * @ClassName: WareFeignService
  * @date ：2025/7/26 15:51
  */
-@FeignClient(name = "ware")
+@FeignClient("ware")
 public interface WareFeignService {
     @RequestMapping("ware/wareinfo/list")
     R list(@RequestParam Map<String, Object> params);

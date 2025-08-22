@@ -31,6 +31,10 @@ public class LoginUserInterceptor implements HandlerInterceptor {
         if (match || match1) {
             return true;
         }
+        /**
+         * already login : pass
+         * not login : redirect to login html
+         * */
         HttpSession session = request.getSession();
         MemberTo member = (MemberTo) session.getAttribute(AuthServerConstant.LOGIN_USER);
         if (member != null) {

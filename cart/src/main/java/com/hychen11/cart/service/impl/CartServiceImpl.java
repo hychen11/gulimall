@@ -1,6 +1,7 @@
 package com.hychen11.cart.service.impl;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.hychen11.cart.feign.ProductFeignService;
 import com.hychen11.cart.interceptor.CartInterceptor;
 import com.hychen11.cart.service.CartService;
@@ -31,7 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Service
 public class CartServiceImpl implements CartService {
     @Resource
-    private RedisTemplate<String,String> redisTemplate;
+    private RedisTemplate<String, String> redisTemplate;
     @Resource
     private ProductFeignService productFeignService;
     @Resource
@@ -152,7 +153,7 @@ public class CartServiceImpl implements CartService {
     private List<CartItem> getCartItems(String cartKey) {
         BoundHashOperations<String, Object, Object> cartOps = redisTemplate.boundHashOps(cartKey);
         List<Object> values = cartOps.values();
-        if (values != null && !values.isEmpty()) {
+        if (!CollectionUtils.isEmpty(values)) {
             return values.stream().map(value -> JSON.parseObject(value.toString(), CartItem.class)).toList();
         }
         return null;
@@ -165,6 +166,7 @@ public class CartServiceImpl implements CartService {
 
     /**
      * 更新购物车选择或取消的商品
+     *
      * @param skuId
      * @param check
      */
@@ -173,11 +175,12 @@ public class CartServiceImpl implements CartService {
         CartItem cartItem = getCartItem(skuId);
         cartItem.setCheck(check == 1);
         BoundHashOperations<String, Object, Object> cartOps = getCartOps();
-        cartOps.put(skuId.toString(),JSON.toJSONString(cartItem));
+        cartOps.put(skuId.toString(), JSON.toJSONString(cartItem));
     }
 
     /**
      * 修改商品的数量
+     *
      * @param skuId
      * @param num
      */
@@ -186,11 +189,12 @@ public class CartServiceImpl implements CartService {
         CartItem cartItem = getCartItem(skuId);
         cartItem.setCount(num);
         BoundHashOperations<String, Object, Object> cartOps = getCartOps();
-        cartOps.put(skuId.toString(),JSON.toJSONString(cartItem));
+        cartOps.put(skuId.toString(), JSON.toJSONString(cartItem));
     }
 
     /**
      * 删除某个商品
+     *
      * @param skuId
      */
     @Override
@@ -201,19 +205,20 @@ public class CartServiceImpl implements CartService {
 
     /**
      * 远程调用，获取当前用户购物车信息
+     *
      * @return
      */
     @Override
     public List<CartItem> getCurrentUserCartItems() {
         UserInfoTo userInfoTo = CartInterceptor.threadLocal.get();
-        if(Objects.isNull(userInfoTo)){
+        if (Objects.isNull(userInfoTo)) {
             return null;
         }
         List<CartItem> cartItems = getCartItems(CartConstant.CART_PREFIX + userInfoTo.getUserId());
-        if(Objects.isNull(cartItems)){
+        if (CollectionUtils.isEmpty(cartItems)) {
             return null;
         }
-        return cartItems.stream().map(item->{
+        return cartItems.stream().map(item -> {
             SkuInfoTo skuInfoTo = productFeignService.infoBySkuId(item.getSkuId());
             item.setPrice(skuInfoTo.getPrice());
             return item;

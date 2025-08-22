@@ -3,12 +3,9 @@ package com.hychen11.ware.controller;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.hychen11.ware.vo.FareVo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.hychen11.ware.entity.WareInfoEntity;
 import com.hychen11.ware.service.WareInfoService;
@@ -30,6 +27,17 @@ public class WareInfoController {
     @Autowired
     private WareInfoService wareInfoService;
 
+
+    /**
+     * 根据用户地址计算运费
+     * @param attrId
+     * @return
+     */
+    @GetMapping("/getFare")
+    public R getFare(@RequestParam("addrId") Long attrId){
+        FareVo fare = wareInfoService.getFare(attrId);
+        return R.ok().setData(fare);
+    }
     /**
      * 列表
      */

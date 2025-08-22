@@ -21,4 +21,5 @@ public class SkuItemVo {
     private List<SkuItemSaleAttrsVo> saleAttrs;
     private SpuInfoDescEntity spuInfoDesc;
     private List<SpuItemAttrGroupVo> attrGroups;
+    private SeckillInfoVo seckillInfo;
 }

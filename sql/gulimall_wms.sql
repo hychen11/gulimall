@@ -30,11 +30,9 @@ CREATE TABLE `undo_log` (
   `log_status` int(11) NOT NULL,
   `log_created` datetime NOT NULL,
   `log_modified` datetime NOT NULL,
-  `ext` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `ux_undo_log` (`xid`,`branch_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
+  UNIQUE KEY `ux_undo_log` (`xid`,`branch_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 /*Data for the table `undo_log` */
 
 /*Table structure for table `wms_purchase` */
@@ -147,7 +145,15 @@ CREATE TABLE `wms_ware_sku` (
 
 /*Data for the table `wms_ware_sku` */
 
+INSERT INTO `wms_ware_sku` VALUES (3, 2, 1, 50, '华为 HUAWEI P40 Pro+ 麒麟990 5G  流光幻镜 套餐三', 0);
+INSERT INTO `wms_ware_sku` VALUES (4, 3, 1, 35, '华为 HUAWEI P40 Pro+ 麒麟990 5G  流光幻镜 套餐一', 0);
+INSERT INTO `wms_ware_sku` VALUES (5, 4, 1, 60, '华为 HUAWEI P40 Pro+ 麒麟990 5G  霓影紫 套餐二', 0);
+INSERT INTO `wms_ware_sku` VALUES (6, 5, 1, 125, '华为 HUAWEI P40 Pro+ 麒麟990 5G  霓影紫 套餐三', 0);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+

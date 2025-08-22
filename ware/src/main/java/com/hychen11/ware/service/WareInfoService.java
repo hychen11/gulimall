@@ -3,6 +3,7 @@ package com.hychen11.ware.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.hychen11.common.utils.PageUtils;
 import com.hychen11.ware.entity.WareInfoEntity;
+import com.hychen11.ware.vo.FareVo;
 
 import java.util.Map;
 
@@ -18,5 +19,7 @@ public interface WareInfoService extends IService<WareInfoEntity> {
     PageUtils queryPage(Map<String, Object> params);
 
     PageUtils queryPageByCondition(Map<String, Object> params);
+
+    FareVo getFare(Long attrId);
 }
 

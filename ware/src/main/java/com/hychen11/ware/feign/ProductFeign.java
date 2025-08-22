@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * @ClassName: productFeign
  * @date ：2025/7/20 18:04
  */
-@FeignClient(name="product")
+@FeignClient("product")
 public interface ProductFeign {
     @RequestMapping("product/skuinfo/infoBySkuId")
     SkuInfoTo infoBySkuId(@RequestParam Long skuId);

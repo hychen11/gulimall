@@ -15,7 +15,7 @@ import java.util.List;
  * @ClassName: ProductFeignService
  * @date ：2025/7/29 00:49
  */
-@FeignClient(name = "search")
+@FeignClient("search")
 public interface ProductFeignService {
     @GetMapping("/product/attr/feign/info/{attrId}")
     AttrRespTo feign_info(@PathVariable("attrId") Long attrId);

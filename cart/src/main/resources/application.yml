@@ -3,10 +3,10 @@ spring:
     name: cart
   cloud:
     nacos:
+      config:
+        server-addr: localhost:8848
       discovery:
-        server-addr: localhost:8849
-        username: nacos
-        password: "nacos"
+        server-addr: localhost:8848
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
   session:

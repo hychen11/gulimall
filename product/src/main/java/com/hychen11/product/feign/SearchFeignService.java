@@ -14,7 +14,7 @@ import java.util.List;
  * @ClassName: SearchFeignService
  * @date ：2025/7/26 15:34
  */
-@FeignClient(name = "search")
+@FeignClient("search")
 public interface SearchFeignService {
     @PostMapping("/search/save/product")
     R productStatusUp(@RequestBody List<SkuEsModel> skuEsModels);

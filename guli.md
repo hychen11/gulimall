@@ -481,7 +481,7 @@ https://github.com/alibaba/spring-cloud-alibaba/blob/2023.x/spring-cloud-alibaba
 #### docker Nacos
 
 ```shell
-(base) ➜  ~ docker run --name nacos -d -p 8849:8848 \                  
+(base) ➜  ~ docker run --name nacos1 -d -p 8848:8848 \                  
 --restart=always \
 -e JVM_XMS=512m \
 -e JVM_XMX=2048m \
@@ -489,8 +489,6 @@ https://github.com/alibaba/spring-cloud-alibaba/blob/2023.x/spring-cloud-alibaba
 -e PREFER_HOST_MODE=hostname \
 -v ~/nacos-logs:/home/nacos/logs \    
 nacos/nacos-server:latest
-
-(base) ➜  ~ docker update nacos --restart=always
 ```
 
 
@@ -520,7 +518,7 @@ Before launching the Nacos Discovery sample for demonstration, take a look at ho
      cloud:
        nacos:
          discovery:
-           server-addr: localhost:8849
+           server-addr: localhost:8848
            username: nacos
            password: "nacos"
      application:
@@ -845,7 +843,7 @@ step1）开启服务注册发现`@EnableDiscoveryClient`
 
 ```properties
 spring.application.name = gateway
-spring.cloud.nacos.config.server-addr = 127.0.0.1:8849
+spring.cloud.nacos.config.server-addr = 127.0.0.1:8848
 spring.cloud.nacos.discovery.namespace = 41e93e2f-de27-4db9-80b9-8ae0fc7e3634
 ```
 
@@ -853,7 +851,7 @@ spring.cloud.nacos.discovery.namespace = 41e93e2f-de27-4db9-80b9-8ae0fc7e3634
 
 ```yml
 spring.application.name=gateway
-spring.cloud.nacos.discovery.server-addr=127.0.0.1:8849
+spring.cloud.nacos.discovery.server-addr=127.0.0.1:8848
 server.port= 12000
 ```
 
@@ -2942,7 +2940,40 @@ thread:
 @EnableConfigurationProperties(value = {ThreadPoolConfigProperties.class})
 ```
 
-### CompletableFuture
+## CompletableFuture
+
+`CompletableFuture.allOf(future1, future2).get();` 这里allOf().get()这里等全部完成
+
+或者 future1, `future2=future1.thenAcceptAsync(a->{}, executor);`, `future2.get()`
+
+### thenApplyAsync
+
+接受返回值并且返回结果
+
+```java
+CompletableFuture<List<MemberAddressVo>> addressFuture = CompletableFuture.supplyAsync(() -> {
+    RequestContextHolder.setRequestAttributes(requestAttributes);
+    return memberFeignService.getAddress(memberRespVo.getId());
+}, executor);
+
+addressFuture.thenApplyAsync(()->{}, executor);
+```
+
+### thenAcceptAsync
+
+接受返回值并且不返回结果
+
+```java
+addressFuture.thenAcceptAsync(()->{}, executor);
+```
+
+### thenRunAsync
+
+不接受返回值并且不返回结果
+
+```java
+addressFuture.thenRunAsync(()->{}, executor);
+```
 
 为什么需要异步编排呢？举个例子
 
@@ -2988,7 +3019,7 @@ all.get(); // 等待所有任务执行完
  获取前面结果并返回新结果
 
 ```java
-CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> 10)
+CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> 10, executor)
     .thenApply(result -> result * 2); // result 是 10，返回 20
 
 System.out.println(future.get()); // 输出 20
@@ -2999,7 +3030,7 @@ System.out.println(future.get()); // 输出 20
 消费前面结果，但不返回
 
 ```java
-CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10)
+CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10, executor)
     .thenAccept(result -> System.out.println("处理结果：" + result));
 ```
 
@@ -3008,7 +3039,7 @@ CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10)
 不关心前面结果，纯粹执行一个操作
 
 ```java
-CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10)
+CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> 10, executor)
     .thenRun(() -> System.out.println("前面的任务完成后，我执行"));
 ```
 
@@ -3433,6 +3464,35 @@ Field             | Value
 "sku_1002"        | {"skuId":1002, "count":1}
 ```
 
+### boundHashOps
+
+`redisTemplate.boundHashOps(cartKey)` 是 Spring Data Redis 提供的一个方法，用于 **操作 Redis 中的 Hash 数据结构**。它的作用是创建一个与特定键（`cartKey`）绑定的 Hash 操作对象，后续可以直接通过该对象对 Hash 进行增删改查，而无需重复指定键名。
+
+假设 `cartKey` 是用户的购物车键（如 `"cart:user1"`）
+
+```java
+// 1. 获取绑定操作对象
+BoundHashOperations<String, String, Object> hashOps = redisTemplate.boundHashOps("cart:user1");
+
+List<Object> values = hashOps.values();
+
+// 2. 直接操作Hash（无需再指定键名）
+hashOps.put("product_1001", 2);       // 添加商品ID:1001，数量2
+hashOps.increment("product_1001", 1); // 商品数量+1
+Object quantity = hashOps.get("product_1001"); // 获取商品数量
+hashOps.delete("product_1001");       // 删除商品
+```
+
+如果不使用 `boundHashOps`，等效代码会更冗长
+
+```java
+// 每次操作都需要显式传递键名
+redisTemplate.opsForHash().put("cart:user1", "product_1001", 2);
+redisTemplate.opsForHash().increment("cart:user1", "product_1001", 1);
+Object quantity = redisTemplate.opsForHash().get("cart:user1", "product_1001");
+redisTemplate.opsForHash().delete("cart:user1", "product_1001");
+```
+
 ### 什么时候更新价格
 
 **注意，每次获取购物车的时候需要更新一下价格（也就是再查询一下！）**
@@ -3629,6 +3689,52 @@ spring.rabbitmq.listener.simple.acknowledge-mode=manual
 - 消息处理成功，ack()，接受下一条消息，此消息broker就会移除
 - 消息处理失败，nack()/reject() 重新发送给其他人进行处理，或者容错处理后ack
 
+```mermaid
+sequenceDiagram
+    participant Producer
+    participant Broker
+    participant Exchange
+    participant Queue
+    participant Consumer
+
+    Producer->>Exchange: 发送消息（指定 Exchange + RoutingKey）
+    Exchange->>Broker: 接收消息并路由
+    alt 路由成功
+        Broker->>Queue: 消息进入队列
+        Queue->>Consumer: 消费者拉取消息
+    else 路由失败
+        Broker->>Producer: 触发 ReturnsCallback
+    end
+```
+
+#### Broker
+
+**角色**：RabbitMQ 服务本身，负责接收、路由和存储消息。
+
+**功能**：管理 Exchange、Queue、Binding 等底层资源。
+
+#### Exchange
+
+**角色**：消息的**入口点**，接收生产者发送的消息，并根据规则（Binding）将消息路由到队列。
+
+**类型**：`Direct`（精准匹配 RoutingKey）、`Fanout`（广播）、`Topic`（模糊匹配）、`Headers`（自定义规则）。
+
+#### Queue
+
+**角色**：存储消息的缓冲区，等待消费者拉取。
+
+**关键特性**：先进先出（FIFO）、可持久化、支持死信队列等。
+
+#### Binding
+
+**角色**：定义 Exchange 和 Queue 的关联规则（如 RoutingKey）
+
+
+
+也就是说msg先进入exchange，然后分发到broker，在发送到queue，由消费者拉取
+
+Broker 宕机如何处理？生产者通过 `ConfirmCallback` 感知，可触发重试或降级逻辑
+
 # 库存
 
 **库存系统**在电商平台中属于“高并发、高一致性要求”
@@ -3722,6 +3828,38 @@ stock_locked -= 购买数量
 
 # 订单
 
+添加新的域名 `vim /etc/hosts`
+
+```bash
+# Gulimall Host Start
+127.0.0.1 mall.com
+127.0.0.1 search.mall.com
+127.0.0.1 item.mall.com
+127.0.0.1 auth.mall.com
+127.0.0.1 cart.mall.com
+127.0.0.1 order.mall.com
+```
+
+#### 订单状态
+
+1. 待付款
+2. 已付款/待发货
+3. 待收货/已发货
+4. 已完成
+5. 已取消
+6. 售后中
+
+#### 订单流程
+
+订单生成 -> 支付订单 -> 卖家发货 -> 确认收货 -> 交易成功
+
+#### 订单登录拦截
+
+需求：去结算、查看订单必须是登录用户之后才能进行的，这里编写一个拦截器。
+
+- 用户登录则放行请求
+- 用户未登录则跳转到登录页面进行登录
+
 注意，关于redis序列化，如果用的默认的序列化器，JdkSerializationRedisSerializer，需要`implements Serializable`，不推荐
 
 而`Jackson2JsonRedisSerializer` 不需要，推荐，将对象转成 JSON
@@ -3767,6 +3905,685 @@ stock_locked -= 购买数量
 
 
 
+说明：结算页中的商品信息是实时获取的，结算的时候会去购物车中再去获取一遍，因此，提交页面的数据Vo没必要提交商品信息
+
+#### 这里提交订单会有一个坑
+
+首先redisConfig里设置了String的kv序列化，设置了Object的kv序列化
+
+这里如果
+
+```java
+@Autowired
+private RedisTemplate<String, String> redisTemplate;
+```
+
+- **明确指定了泛型类型**：
+  - Key 是 `String`
+  - Value 是 `String`
+- **Spring 会基于类型安全做序列化**：
+  - 自动使用 `StringRedisSerializer` 序列化 Key 和 Value
+  - 方法返回值类型明确，不会出现 `Object` 转换问题
+
+```java
+@Autowired
+private RedisTemplate redisTemplate;
+```
+
+- **没有指定泛型**（相当于 `RedisTemplate<Object, Object>`）
+
+```java
+Long result = redisTemplate.execute(
+        new DefaultRedisScript<Long>(script, Long.class),
+        Arrays.asList(OrderConstant.USER_ORDER_TOKEN_PREFIX + memberTo.getId()),
+        orderToken
+);
+```
+
+**execute(arg1,arg2,arg3)参数解释：**
+
+- arg1：用DefaultRedisScript的构造器封装脚本和返回值类型
+- arg2：数组，用于存放Redis中token的key
+- arg3：用于比较的token即浏览器存储的token
+
+**第二和第三个参数**分别对应 Lua 脚本中的 `KEYS[1]` 和 `ARGV[1]`
+
+```lua
+-- Lua 脚本
+if redis.call('get', KEYS[1]) == ARGV[1] then  -- 比较Redis中的值（KEYS[1]）和传入的值（ARGV[1]）
+    return redis.call('del', KEYS[1])           -- 如果匹配，删除键并返回1（成功）
+else
+    return 0                                   -- 不匹配返回0（失败）
+end
+```
+
+生成唯一的订单号，IdWorker**基于 Snowflake 算法**一个分布式唯一的id，
+
+```
+// 1、生成一个订单号
+String orderSn = IdWorker.getTimeId();
+```
+
+### confirmOrder
+
+异步查询address和cart，查询库存信息，查询积分，并且设置防重token，idempotency key，存放在redis里
+
+### submitOrder
+
+1 通过redis lua删除idempotency key，
+
+2 createOrder创建订单、订单项等信息
+
+3 随后验价
+
+4 通过就saveOrder，存入数据库
+
+5 库存锁定，只要有异常回滚订单数据，如果锁库存失败了就抛个异常
+
+### createOrder
+
+生成订单号和订单Entity，计算价格，积分Integration，优惠券coupon，优惠活动promotion
+
+# RequestAttributes
+
+Feign远程调用的时候会丢失请求头（因为feign远程调用是新创建了一个request）：导致请求在远程调用之后请求头没有携带cookie信息，那么就无法找到那个携带session信息的cookie了，也就无法从redis中获取用户登录信息了（因为每个用户用浏览器登录之后都会存储一个包含他登录信息的cookie，key可以是任意的因为服务器知道它是存储session用的，value是唯一标识这个用户的一个值，服务器识别到这个存储session的cookie之后就会根据它的value去redis中查是否有这个用户的登录信息）。
+
+解决：加上feign它的远程调用的请求拦截器。(RequestInterceptor)，**在这个拦截器中**重写apply方法，在这个方法中把老请求的cookie复制到新request的请求头中，因为feign在远程调用之前会执行所有的**RequestInterceptor**拦截器（feign的拦截器）
+
+- **`RequestAttributes`** 是 Spring 对 HTTP 请求上下文的抽象封装，存储了当前请求的所有信息（如 Session、请求头、参数等）。
+- 在 Web 环境中，Spring 通过 `RequestContextHolder` 将当前请求的 `RequestAttributes` 绑定到线程本地变量（ThreadLocal），因此**同一个线程内**可以随时获取请求上下文。
+
+`CompletableFuture.runAsync()` 执行异步任务，这会切换到**新的线程**，而 ThreadLocal 存储的 `RequestAttributes` **默认不会自动跨线程传递**
+
+如果不手动设置，Feign 客户端在异步线程中发起远程调用时：
+
+- 无法获取原始请求的认证信息（如 `Authorization` 头）。
+- 可能导致拦截器、过滤器等无法正常工作（因为它们依赖请求上下文）
+
+由于 **RequestContextHolder底层**使用的是线程共享数据 `ThreadLocal<RequestAttributes>`，我们知道线程共享数据的域是当前线程下，线程之间是不共享的
+
+先在主线程中获取到请求头相关信息`RequestContextHolder.getRequestAttributes();`，然后在异步调用的过程中将情求头加到正在执行异步操作的线程中，这样请求头就不会丢失。
+
+虽然都是同一个 RequestContextHolder类在调用方法，但是 RequestContextHolder在不同线程中的意义是不同的，仅代表当前线程。
+
+```java
+@Configuration
+public class FeignConfig {
+    /**
+     * 解决远程调用请求头丢失问题
+     *
+     * @return
+     */
+    @Bean
+    public RequestInterceptor requestInterceptor() {
+        return new RequestInterceptor() {
+            @Override
+            public void apply(RequestTemplate requestTemplate) {
+                //1.使用RequestContextHolder拿到请求数据
+                ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attributes != null) {
+                    HttpServletRequest request = attributes.getRequest();
+                    //同步请求头数据
+                    String cookie = request.getHeader("Cookie");
+                    requestTemplate.header("Cookie", cookie);
+
+                }
+            }
+        };
+    }
+}
+```
+
+
+
+```java
+CompletableFuture<Void> addressFuture = CompletableFuture.runAsync(() -> {
+    //1.远程查询当前会员的地址
+    RequestContextHolder.setRequestAttributes(requestAttributes);
+    List<MemberAddressVo> address = memberFeignService.getAddress(member.getId());
+    orderConfirm.setAddress(address);
+}, executor);
+CompletableFuture<Void> orderItemFuture = CompletableFuture.runAsync(() -> {
+    //2.远程查询当前会员的购物车信息
+    RequestContextHolder.setRequestAttributes(requestAttributes);
+    List<OrderItemVo> orderItems = cartFeignService.getCurrentUserCartItems();
+    orderConfirm.setItems(orderItems);
+    //feign在远程调用之前要构造请求，会调用很多拦截器
+    //RequestInterceptor interceptor : requestInterceptors
+}, executor).thenRunAsync(() -> {
+    //查询库存信息
+    List<OrderItemVo> items = orderConfirm.getItems();
+    List<Long> skuIds = items.stream().map(OrderItemVo::getSkuId).toList();
+    List<SkuHasStockVo> skusHasStock = wareFeignService.getSkusHasStock(skuIds);
+    if (skusHasStock != null) {
+        Map<Long, Boolean> stocks = skusHasStock.stream().collect(Collectors.toMap(SkuHasStockVo::getSkuId, SkuHasStockVo::getHasStock));
+        orderConfirm.setStocks(stocks);
+    }
+}, executor);
+```
+
+# 幂等性
+
+### 场景
+
+1. 用户多次点击按钮
+2. 用户页面回退再次提交
+3. 微服务互相调用，由于网络问题，导致请求失败。
+4. feign调用其他业务触发重试机制情况
+
+什么情况下需要幂等
+
+以 SQL 为例，有些操作是天然幂等的。
+
+`SELECT * FROM table WHER id=?`，无论执行多少次都不会改变状态，是天然的幂等。
+
+`UPDATE tab1 SET col1=1 WHERE col2=2`，无论执行成功多少次状态都是一致的，也是幂等操作。
+
+`delete from user where userid=1`，多次操作，结果一样，具备幂等性。
+
+`insert into user(userid,name) values(1,'a') `如 userid 为唯一主键，即重复操作上面的业务，只会插入一条用户数据，具备幂等性。
+
+`UPDATE tab1 SET col1=col1+1 WHERE col2=2`，每次执行的结果都会发生变化，不是幂等的。
+
+`insert into user(userid,name) values(1,'a')` 如果 userid 不是主键，可以重复，那上面业务多次操作，数据都会新增多条，不具备幂等性。
+
+### Token机制
+
+1. 服务端提供了发送 token 的接口。我们在分析业务的时候，哪些业务是存在幂等问题的， 就必须在执行业务前，先去获取 token，服务器会把 token 保存到 redis 中。
+
+2. 然后调用业务接口请求时，把 token 携带过去，一般放在请求头部。
+
+3. 服务器判断 token 是否存在 redis 中，存在表示第一次请求，然后删除 token, 继续执行业务。
+
+4. 如果判断 token 不存在 redis 中，就表示是重复操作，直接返回重复标记给 client，这样就保证了业务代码，不被重复执行。
+
+#### 先删除 token 还是后删除 token
+
+先删除可能导致，业务确实没有执行，重试还带上之前 token，由于防重设计导致，请求还是不能执行。
+
+后删除可能导致，业务处理成功，但是服务闪断，出现超时，没有删除 token，别人继续重试，导致业务被执行两遍。
+
+我们最好设计为先删除 token，如果业务调用失败，就重新获取 token 再次请求。
+
+#### Token 获取、比较和删除必须是原子性
+
+redis.get(token) 、token.equals、redis.del(token)如果这几个操作不是原子，可能导致高并发下，都 get 到同样的数据，判断都成功，继续业务并发执行。
+
+使用lua脚本，但是更推荐直接使用redisson！
+
+```xml
+<dependency>
+    <groupId>org.redisson</groupId>
+    <artifactId>redisson-spring-boot-starter</artifactId>
+    <version>3.17.7</version>
+</dependency>
+```
+
+
+
+这段 Lua 脚本通常用于 **分布式锁的释放**，例如：
+
+1. **RedLock（Redis 分布式锁）**
+2. **秒杀系统防止超卖**
+3. **防止重复提交（幂等性控制）**
+
+```java
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import java.util.Collections;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+public class RedisDistributedLock {
+
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ThreadLocal<String> lockValue = new ThreadLocal<>(); // 存储当前线程的锁 value（UUID）
+
+    public RedisDistributedLock(RedisTemplate<String, String> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
+
+    /**
+     * 尝试获取分布式锁（支持自动续期）
+     * @param lockKey     锁的 key
+     * @param expireTime  锁的过期时间（毫秒）
+     * @param waitTime    获取锁的最大等待时间（毫秒）
+     * @return true 加锁成功，false 加锁失败
+     */
+    public boolean tryLock(String lockKey, long expireTime, long waitTime) throws InterruptedException {
+        String value = UUID.randomUUID().toString();
+        lockValue.set(value); // 存储当前线程的锁 value
+
+        long endTime = System.currentTimeMillis() + waitTime;
+        while (System.currentTimeMillis() < endTime) {
+            // 尝试加锁（SETNX + EXPIRE）
+            Boolean success = redisTemplate.opsForValue().setIfAbsent(
+                lockKey,
+                value,
+                expireTime,
+                TimeUnit.MILLISECONDS
+            );
+            if (Boolean.TRUE.equals(success)) {
+                // 加锁成功，启动看门狗（自动续期）
+                startWatchDog(lockKey, expireTime);
+                return true;
+            }
+            // 短暂休眠，避免 CPU 空转
+            Thread.sleep(100);
+        }
+        return false; // 超时未获取锁
+    }
+
+    /**
+     * 释放分布式锁（Lua 脚本保证原子性）
+     * @param lockKey 锁的 key
+     * @return true 解锁成功，false 解锁失败（锁不存在或值不匹配）
+     */
+    public boolean releaseLock(String lockKey) {
+        String value = lockValue.get();
+        if (value == null) {
+            return false; // 当前线程未持有锁
+        }
+
+        // Lua 脚本（原子性：检查 value 是否匹配，匹配才删除）
+        String luaScript =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+            "    return redis.call('del', KEYS[1]) " +
+            "else " +
+            "    return 0 " +
+            "end";
+
+        RedisScript<Long> script = new DefaultRedisScript<>(luaScript, Long.class);
+        Long result = redisTemplate.execute(
+            script,
+            Collections.singletonList(lockKey),
+            value
+        );
+
+        // 清理 ThreadLocal
+        lockValue.remove();
+        return result != null && result == 1;
+    }
+
+    /**
+     * 看门狗线程（自动续期）
+     */
+    private void startWatchDog(String lockKey, long expireTime) {
+        Thread watchDogThread = new Thread(() -> {
+            try {
+                while (true) {
+                    // 每隔 expireTime / 3 时间续期一次
+                    Thread.sleep(expireTime / 3);
+                    // 检查锁是否仍属于当前线程，如果是则续期
+                    String currentValue = redisTemplate.opsForValue().get(lockKey);
+                    if (lockValue.get().equals(currentValue)) {
+                        redisTemplate.expire(lockKey, expireTime, TimeUnit.MILLISECONDS);
+                    } else {
+                        break; // 锁已被其他线程获取，停止续期
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        watchDogThread.setDaemon(true); // 设置为守护线程
+        watchDogThread.start();
+    }
+}
+```
+
+### 唯一约束
+
+#### 数据库唯一约束
+
+插入数据，应该按照唯一索引进行插入，比如订单号，相同的订单就不可能有两条记录插入。 我们**在数据库层面防止重复**。
+
+如果是分库分表场景下，**路由规则要保证相同请求下，落地在同一个数据库和同一表中**，要不然数据库主键约束就不起效果了，因为是不同的数据库和表主键不相关。
+
+#### redis set 防重
+
+很多数据需要处理，只能被处理一次，比如我们可以计算数据的 MD5 将其放入 redis 的 set， 每次处理数据，先看这个 MD5 是否已经存在，存在就不处理。
+
+Redis set的防重场景：每个数据的MD5加密后的值唯一，网盘就可以根据上传的数据进行MD5加密，将加密后的数据存储至Redis的set里，下次你上传同样的东西时先会去set进行判断是否存在，存在就不处理
+
+### 防重表
+
+是一种**基于数据库唯一索引约束实现请求去重**的技术方案，主要用于解决重复提交、接口幂等性问题。它的核心思想是：**利用数据库的唯一约束，在业务操作前先记录请求标识，确保相同请求只能被处理一次**。
+
+```sql
+CREATE TABLE `idempotent_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `order_no` varchar(64) NOT NULL COMMENT '订单号（唯一标识）',
+  `business_type` varchar(32) NOT NULL COMMENT '业务类型',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no_type` (`order_no`, `business_type`) -- 唯一索引
+) ENGINE=InnoDB;
+```
+
+**`order_no` + `business_type`** 组成唯一索引，确保同一业务类型的同一订单号只能插入一次
+
+```java
+@Transactional
+public void processOrder(String orderNo) {
+    // 1. 先尝试插入防重表（如果已存在会抛唯一约束异常）
+    IdempotentRecord record = new IdempotentRecord();
+    record.setOrderNo(orderNo);
+    record.setBusinessType("ORDER_CREATE");
+    idempotentRecordDao.insert(record); // 插入防重表
+
+    // 2. 执行业务操作（扣减库存、创建订单等）
+    orderService.createOrder(orderNo);
+    inventoryService.deductStock(orderNo);
+}
+```
+
+- **如果在插入防重表时发生唯一键冲突**（`DuplicateKeyException`），说明该请求已被处理过，直接拒绝。
+- **如果业务操作失败**，事务会回滚，防重表的记录也会被撤销，保证数据一致性
+
+##### 为什么防重表和业务表要在同一个数据库
+
+**事务一致性**：
+
+- 如果防重表和业务表跨库，无法保证“插入防重表 + 业务操作”的原子性。
+- 例如：防重表插入成功，但业务操作失败，由于跨库事务无法回滚，会导致后续合法请求被误拦截。
+
+### 全局请求唯一 id
+
+nginx配置
+
+```
+http {
+    server {
+        listen 80;
+        location / {
+            proxy_pass http://backend;
+            proxy_set_header X-Request-Id $request_id;  # 关键配置
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+    }
+}
+```
+
+##### `$request_id` 变量
+
+Nginx 内置变量，自动为每个请求生成一个 **唯一字符串**（如 `7f2a1b3c4d5e6f7a8b9c0d1e2f3a4b5c`）。
+
+格式：通常是 32 位十六进制数（类似 UUID）。
+
+##### `proxy_set_header` 指令
+
+将 `$request_id` 添加到 HTTP 请求头，传递给后端服务
+
+```
+location / {
+    proxy_pass http://backend;
+    proxy_set_header X-Request-Id $request_id;  # 关键配置
+}
+```
+
+# RabbitMQ
+
+RabbitMQ延时队列实现柔性事务+可靠消息+最终一致性
+
+场景：比如未付款订单，超过一定时间后，系统自动取消订单并释放占有商品的库存
+
+使用SpringSchedule定时cron任务轮训数据库
+
+缺点：消耗系统内存（需要创建定时任务且定时任务一直运行）、增加了数据库的压力、存在较大的时间误差
+
+对数据库中订单表**进行定时全表扫描**。而且由于我们只有一个定时任务，那么其实是非常有可能发生定时**任务的时效性问题的**
+
+解决方法MQ+DQ+DLQ
+
+### DQ
+
+设置消息过期时间：对消息本身进行设置x-message-ttl参数，那么每条消息的过期时间都不一样，设置消息属性的 expiration 参数的值，单位为 ms
+
+设置队列过期时间：x-expires参数，这种设置后，该队列中所有的消息都存在相同的过期时间，x-message-ttl 参数，单位为ms
+
+两个都设置了取小
+
+这里延迟队列是模拟出来的，设置死信队列中的消息的过期时间来让其在一段时候后变成死信，又可以控制变成死信的消息被路由到一个指定的交换机，**消费者监听死信交换绑定的队列，而不要监听消息发送的队列**
+
+### DLQ
+
+x-dead-letter-exchange：出现dead letter之后将 Dead Letter 重新发送到指定 exchange
+
+x-dead-letter-routing-key：出现dead letter之后将 Dead Letter 重新按照指定的 routing-key 发送
+
+- 消息被Consumer拒收（Basic.Reject或Basic.Nack）并且设置 requeue 参数的值为 false（不会再次放到队列中）
+- 消息的TTL时间到了，即消息过期了
+- 队列达到最大的长度，排在前面的消息就会被丢弃或者扔到死信路由上。
+
+### lazy update
+
+RabbitMQ采用的惰性检查机制即懒检查机制，比如我们给队列连发三条消息（第一条10分钟过期，二三条1分钟过期），但服务器来拿消息时根据队列应该先拿第一条消息，拿到之后发现10分钟过期，那么十分钟之后才会再次来拿消息，那么二三条消息拿取的时间就会也在十分钟之后了。这里的队列是无人消费的队列，拿取的意思是拿到消息然后放到死信队列中。
+
+### 模拟延迟队列
+
+这里模拟延迟队列有两种实现方法，一设置队列过期时间，二设置消息过期时间，由于上面的lazy update的情况，这里推荐队列过期
+
+### 延时队列定时关单模拟
+
+订单超时未支付触发订单过期状态修改与库存解锁
+
+创建订单时消息会被发送至队列`order.delay.queue`，经过 TTL 的时间后消息会变成死信以`order.release.order`的路由键经交换机转发至队列`order.release.order.queue`，再通过监听该队列的消息来实现过期订单的处理
+
+- 如果该订单已支付，则无需处理
+- 否则说明该订单已过期，修改该订单的状态并通过路由键`order.release.other`发送消息至队列`stock.release.stock.queue`进行库存解锁
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/91cfd41110b3d139df94814658adb1a4.png#pic_center)
+
+Order-event-exchange交换机绑定了两个队列
+
+- order.delay.queue队列，绑定的路由键是：order.creare.order
+- order.release.order.queue 队列，绑定的路由键是：order.release.order
+
+1. 下订单，发送到服务器，消息的路由键是：order.creare.order
+
+2. 消息发送到 order.delay.queue队列，一分钟后，消息TTL已过期，发送到 Order-event-exchange 交换机，携带路由键是：order.release.order
+
+3. 消息发送到order.release.order.queue队列，监听该队列
+
+我们创建订单发送消息先进入一个无人消费的队列，这个队列是有过期时间的，然后给这个队列绑定一个交换机，这个交换机绑定的是死信队列，然后消息过期进入死信队列，我们监听这个死信队列。
+
+### 库存自动解锁***
+
+库存锁定后延迟检查是否需要解锁库存，在库存锁定后通过路由键stock.locked发送至延迟队列stock.delay.queue，延迟时间到，死信通过路由键stock.release转发至stock.release.stock.queue，通过监听该队列进行判断当前订单状态，来确定库存是否需要解锁
+
+由于关闭订单和库存解锁都有可能被执行多次，因此要保证业务逻辑的**幂等性**，在执行业务时重新查询当前的状态进行判断
+
+订单关闭和库存解锁都会进行库存解锁的操作，来确保业务异常或者订单过期时库存会被可靠解锁
+
+#### 监听商品锁库存状态
+
+库存解锁的两种场景：
+
+下单成功，订单过期没有支付被系统自动取消、被用户手动取消。都要解锁
+
+下单成功，库存锁定成功，接下来的业务调用失败，导致订单回滚。之前锁定的库存就要自动解锁
+
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/9f1e0d61491cd57c80d71eec53213c2d.png#pic_center)
+
+这里也就是stock.locked 延时时间到了就放在release.stock.queue里，通过监听该队列进行判断当前订单状态，来确定是否需要解锁
+
+### CallBack
+
+ConfirmCallback 确认消息是否成功到达Broker（RabbitMQ服务器）
+
+ReturnsCallback 确认消息是否成功从Exchange路由到Queue
+
+```java
+ rabbitTemplate.setConfirmCallback(new RabbitTemplate.ConfirmCallback() {
+        /**
+         *
+         * @param correlationData 当前消息的唯一关联数据(这个是消息的唯一id),需要在发送消息时设置
+         * @param b 即ack,表示消息是否成功收到，只要消息抵达Broker就ack=true
+         * @param s 即cause,表示失败的原因
+         */
+        @Override
+        public void confirm(CorrelationData correlationData, boolean b, String s) {
+            if (!b) {
+                //出错了，修改数据库当前消息的状态
+                log.error("消息抵达服务器(Broker)失败，失败原因:{}", s);
+            }
+        }
+    });
+    //设置消息抵达队列的确认回调
+    rabbitTemplate.setReturnsCallback(new RabbitTemplate.ReturnsCallback() {
+        /**
+         * 只要消息没有投递给指定的队列，就触发失败回调
+         * @param returnedMessage 投递失败的消息
+         */
+        @Override
+        public void returnedMessage(ReturnedMessage returnedMessage) {
+            //出错了，修改数据库当前消息的状态
+            log.error("消息从exchange发送到queue失败，失败信息:{}", returnedMessage);
+        }
+    });
+}
+```
+
+注意看这里的三个回调参数
+
+- `correlationData`：发送消息时设置的关联数据（通常包含消息ID）
+- `ack`(boolean)：true表示消息成功到达Broker，false表示失败
+- `cause`(String)：失败原因（当ack为false时）
+
+```java
+@Bean
+public Queue orderReleaseOrderQueue() {
+    return new Queue("order.release.order.queue", true, false, false, null);
+}
+
+@Bean
+public Exchange orderEventExchange() {
+    return new TopicExchange("order-event-exchange", true, false, null);
+}
+```
+
+**Queue构造函数参数**：
+
+1. `name`: 队列名称"order.delay.queue"
+2. `durable`: true表示队列持久化，Broker重启后仍然存在
+3. `exclusive`: false表示不排他，多个消费者可以访问
+4. `autoDelete`: false表示不自动删除（没有消费者时不会自动删除）
+5. `arguments`: 额外参数配置
+
+**TopicExchange构造函数参数**：
+
+1. `name`: 交换机名称"order-event-exchange"
+2. `durable`: true表示交换机持久化
+3. `autoDelete`: false表示不自动删除
+
+下面就是把queue和exchange绑定在一起
+
+```java
+@Bean
+public Binding orderReleaseOrderBinding() {
+    return new Binding("order.release.order.queue", Binding.DestinationType.QUEUE
+            , "order-event-exchange", "order.release.order", null);
+}
+```
+
+### Channel
+
+- `Channel` 是 RabbitMQ 的 **通信通道**，用于 **发送/接收消息**、**确认/拒绝消息** 等操作。
+- 每个 `Channel` 对应一个 TCP 连接，**多线程环境下应避免共享 Channel**（线程不安全）。
+
+```java
+@Service
+@RabbitListener(queues = "stock.release.stock.queue")
+@Slf4j
+public class StockReleaseListener {
+	  @RabbitHandler
+    public void handleStockLockedRelease(StockLockedTo to, Message message, Channel channel) throws IOException {
+    		// 成功处理消息（解锁成功或无需解锁）
+        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+
+        // 远程调用失败，消息重新入队
+        channel.basicReject(message.getMessageProperties().getDeliveryTag(), true);
+    }
+}
+```
+
+#### 手动确认（Manual ACK）
+
+- **作用**：消费者处理完消息后，需 **显式通知 RabbitMQ** 消息是否成功消费。
+
+- **配置**：
+
+  ```properties
+  spring.rabbitmq.listener.simple.acknowledge-mode=manual
+  ```
+
+- **优势**：避免消息因未被正确处理而被自动删除（如业务逻辑抛出异常但消息已确认）。
+
+#### 消息拒绝与重试
+
+- **`basicReject`**：拒绝单条消息，可选择是否重新入队（`requeue=true`）。
+- **`basicNack`**：功能类似，但支持批量拒绝。
+
+### 定时关单
+
+定时关单和自动解锁库存都是根据延时队列实现的，根据监听死信队列中的信息分别修改订单信息和库存信息。两者是一体的，只是操作对象不同。但是如果处理下单请求时出现异常导致下单失败，订单数据回滚，那么之前锁的库存以为远程调用并不会回滚（这里因为并发原因没有使用分布式事务Seata处理），所以需要有一个自动解锁库存的功能。也就是说自动解锁库存是防止下单出现异常而存在的，**因为定时关单成功之后会发送一个解锁库存的消息给MQ。**
+
+而且不会出现解锁两次库存导致库存解锁多的场景，因为订单和库存工作单都有其状态，每次关单和解锁库存时都会判断其状态，只有状态符合关单和解锁状态时才会执行相应的业务逻辑。即实现了关单和解锁库存的幂等性。
+
+订单创建成功时向MQ中延时队列发送消息，携带路由键`order.create.order`
+
+30分钟后未支付，则释放订单服务向MQ中发送消息，携带路由键`order.release.order`
+
+- 监听该`order.release.order.queue` 队列的服务会收到关单的消息，然后进行释放订单服务
+
+### 关于订单取消vs库存取消
+
+#### 订单解锁（Order Release）
+
+- **触发条件**：订单支付超时或用户主动取消。
+- **行为**：
+  - 修改订单状态为 **“已取消”**（如 `status=4`）。
+  - 发送 **库存解锁消息**（通过MQ通知库存服务）。
+
+#### 库存解锁（Stock Release）
+
+- **触发条件**：
+  - 收到订单服务的 **订单取消消息**（明确需解锁）。
+  - 收到库存服务的 **库存锁定超时消息**（需二次确认订单状态）。
+- **行为**：
+  - 检查订单状态：
+    - 若订单已取消 → 解锁库存。
+    - 若订单未取消 → 保持锁定（可能需重试机制）。
+
+当 **订单创建成功但库存解锁消息先于订单状态更新到达** 时，会导致：
+
+1. 库存解锁服务检查订单状态时，订单仍为 **新建状态**（未取消），因此 **不执行解锁**。
+2. 后续订单因支付超时被取消，但 **库存已错过解锁时机**，导致 **库存永久锁定**（业务异常）。
+
+#### **优化方案**
+
+1. **双重触发机制**：
+   - **路径1**：订单取消时 **主动发送库存解锁消息**（强触发）
+   - **路径2**：库存服务 **定时扫描未解锁的库存**（兜底逻辑）
+2. **幂等性设计**：
+   - 解锁前检查库存的 **当前锁定状态**，避免重复操作。
+
+#### 关单成功发送解锁库存消息
+
+在订单的关闭之后时向MQ发送消息，以免之前所说的库存解锁不掉的bug出现，即每次订单成功关闭都会向库存服务发送解锁库存逻辑
+
+### 防止消息丢失
+
+手动ack，消费成功才移除，失败noAck重新入队
+
+同时做好ConfirmCallback和ReturnsCallback
+
+做好try Catch
+
+TODO: 增加TCC重试
+
 # Seata分布式事务
 
 ### 为什么要代理数据源？
@@ -3785,19 +4602,400 @@ stock_locked -= 购买数量
 2. 在执行 SQL 时插入一些“事务钩子”；
 3. 当发生异常时能自动 **回滚** 所有参与服务的数据库操作。
 
+![在这里插入图片描述](https://i-blog.csdnimg.cn/blog_migrate/ea0a3d589025cf76bf8ddff402dcf1aa.png)
+
+### 事务失效原因
+
+1. 未开启事务的自动配置，@TransactionAutoConfiguration，这个注解用来启用spring事务自动管理事务的功能，如果没写则SpringBoot不会开启自动管理事务的功能
+
+2. 方法不是public类型的，@Transaction 可以用在类上、接口上、public方法上，如果将@Trasaction用在了非public方法上，事务将无效
+
+3. 数据源未配置事务管理器，**"数据源未配置事务管理器"** 的意思是：Spring 知道你要操作哪个数据库（数据源），但它找不到一个专门用来管理这个数据库事务的“管理员”（事务管理器）。
+
+```java
+@Configuration
+public class WrongDataSourceConfig {
+
+    // 配置用户数据源
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.user")
+    public DataSource userDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    // 配置订单数据源
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.order")
+    public DataSource orderDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    // ！！！ 问题就在这里 ！！！
+    // 只为用户数据源配置了事务管理器，订单数据源没有配置！
+    @Bean
+    public PlatformTransactionManager transactionManager(@Qualifier("userDataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+}
+```
+
+4. spring是通过aop的方式，对需要spring管理事务的bean生成了代理对象，然后通过代理对象拦截了目标方法的执行，在方法前后添加了事务的功能，所以必须通过代理对象调用目标方法的时候，事务才会起效。
+
+看下面代码，大家思考一个问题：当外部直接调用m1的时候，m2方法的事务会生效么？
+
+```java
+@Component
+public class UserService {
+    public void m1(){
+        this.m2();
+    }
+    @Transactional
+    public void m2(){
+        //执行db操作
+    }
+}
+```
+
+这里`this.m2()` 没用代理，transactional不会生效，因为没有通过AOP
+
+显然不会生效，因为m1中通过this的方式调用了m2方法，而this并不是代理对象，this.m2()不会被事务拦截器拦截，所以事务是无效的，如果外部直接调用通过UserService这个bean来调用m2方法，事务是有效的，上面代码可以做一下调整，如下，@1在UserService中注入了自己，此时会产生更为严重的问题：循环依赖
+
+```java
+@Component
+public class UserService {
+    @Autowired //@1
+    private UserService userService;
+
+    public void m1() {
+        this.userService.m2();
+    }
+    @Transactional
+    public void m2() {
+        //执行db操作
+    }
+}
+```
+
+5. 异常类型错误， `@Transactional`  默认情况下，**RuntimeException**和**Error**的情况下，spring事务才会回滚
+
+这里自定义异常`@Transactional(rollbackFor = {异常类型列表})`
+
+6. 异常被吞了，当业务方法抛出异常，spring感知到异常的时候，才会做事务回滚的操作，若方法内部将异常给吞了，那么事务无法感知到异常了，事务就不会回滚了。
+
+   事务操作2发生了异常，但是被捕获了，不往外抛出，此时事务并不会被回滚
+
+   ```java
+   @Transactional
+   public void m1(){
+       //t1
+       try{
+           //t2
+       }catch(Exception e){
+       }
+   }
+   ```
+
+7. 业务和spring事务代码必须在一个线程中，spring事务实现中使用了ThreadLocal，可以实现同一个线程中数据共享，必须是同一个线程的时候，数据才可以共享，这就要求业务代码必须和spring事务的源码执行过程必须在一个线程中，才会受spring事务的控制，比如下面代码，方法内部的子线程内部执行的事务操作将不受m1方法上spring事务的控制
+
+   ```java
+   @Transactional
+   public void m1() {
+       new Thread() {
+           //一系列事务操作
+       }.start();
+   }
+   ```
+
+8. **在同一个类里面，编写两个方法，内部调用的时候，会导致事务设置失效问题**。原因是没有用到代理对象的缘故。
+
+### 解决方法
+
+解决方案中的四个步骤就是为实现这个目标：
+
+##### 引入`spring-boot-starter-aop`
+
+- 事务、异步等AOP功能都依赖AOP框架来实现动态代理。
+- 这个starter提供了必要的库（如AspectJ）来支持更强大的代理功能。
+
+##### 开启`@EnableTransactionManagement(proxyTargetClass = true)`
+
+- `@EnableTransactionManagement`：启用Spring的注解驱动事务管理。
+- `proxyTargetClass = true`：强制Spring使用**CGLIB**来创建代理，而不是默认的JDK动态代理。
+  - **CGLIB**可以代理类（不需要实现接口）。
+  - **JDK动态代理**只能代理接口。
+  - 使用CGLIB更通用，可以避免因为没实现接口而导致的代理失败问题。
+
+##### 开启`@EnableAspectJAutoProxy(exposeProxy = true)`
+
+- `@EnableAspectJAutoProxy`：启用AspectJ风格的自动代理。
+- **`exposeProxy = true`**：**这是最关键的一步！**
+  - 它的作用是将当前代理对象（AOP Proxy）**暴露到`AopContext`的一个线程局部变量（ThreadLocal）中**。
+  - 这样，你就可以在代码的任何地方通过`AopContext.currentProxy()`来获取到当前正在使用的代理对象。
+
+##### 使用`AopContext.currentProxy()`调用方法
+
+```java
+@Service
+public class UserServiceImpl implements UserService {
+
+    public void a() {
+        // 获取当前方法的代理对象，而不是用this
+        UserService userServiceProxy = (UserService) AopContext.currentProxy();
+        
+        // 使用代理对象调用方法，事务生效
+        userServiceProxy.b(); 
+        userServiceProxy.c(); 
+    }
+
+    @Transactional
+    public void b() {
+        // 执行数据库操作
+    }
+
+    @Transactional
+    public void c() {
+        // 执行数据库操作
+    }
+}
+```
+
+### AT、TCC、SAGA 和 XA 事务模式
+
+TC (Transaction Coordinator) - 事务协调者，维护全局和分支事务的状态，驱动全局事务提交或回滚。
+
+TM (Transaction Manager) - 事务管理器，定义全局事务的范围：开始全局事务、提交或回滚全局事务。
+
+RM (Resource Manager) - 资源管理器，管理分支事务处理的资源，与TC交谈以注册分支事务和报告分支事务的状态，并驱动分支事务提交或回滚。
+
+```java
+@GlobalTransactional
+public void purchase(String userId, String commodityCode, int orderCount) {
+    ......
+}
+```
+
+1. **开始全局事务**
+   - 当调用 `purchase` 方法时，Seata 的全局事务管理器（TM）会**拦截**这个注解。
+   - TM 会向 Seata 的**事务协调器（TC）** 申请开始一个新的全局事务。
+   - TC 会生成一个唯一的**全局事务ID（XID）**，并将其贯穿整个调用链。
+2. **执行分支事务（第一阶段）**
+   - 方法内的代码开始按顺序执行。
+   - **执行订单服务调用**：订单服务在自己的数据库里执行 `INSERT INTO order_table ...`。在执行前，Seata 的**资源管理器（RM）** 会拦截这个SQL，向 TC **注册**一个分支事务，并将 XID 和事务前后的数据镜像（用于回滚的 `undo_log`）保存在订单服务的数据库中。**注意：此时订单事务并未提交，但资源已被锁定。**
+   - **执行库存服务调用**：库存服务在自己的数据库里执行 `UPDATE storage_table SET count = count - #{orderCount} ...`。同样，RM 会拦截SQL，向 TC 注册另一个分支事务，并保存 `undo_log`。库存事务也处于未提交状态。
+   - 这两个本地事务的提交与否，完全由后续的全局事务决议决定。
+3. **全局事务决议（第二阶段）**
+   - `purchase` 方法内的所有业务代码执行完毕后，TM 会向 TC 发起**全局提交或回滚的决议**。
+   - **Case 1: 全部成功** - 如果所有分支事务的 Try 阶段都成功注册，TM 会向 TC 发起**全局提交**。
+     - TC 会异步地通知所有分支事务（订单RM、库存RM）进行提交。
+     - 各个 RM 收到通知后，会删除第一阶段保存的 `undo_log` 记录，并正式提交本地事务，释放资源。
+   - **Case 2: 出现失败** - 如果在执行过程中任何一步抛出异常（比如库存不足、网络超时、服务宕机），TM 会向 TC 发起**全局回滚**。
+     - TC 会通知所有已注册的分支事务进行回滚。
+     - 各个 RM 收到通知后，会根据第一阶段保存的 `undo_log` 日志，生成反向的补偿SQL（例如，将冻结的库存加回去，或者删除刚创建的订单记录）并执行，从而回滚本地事务，最后删除 `undo_log`。
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant App as 业务方法 (purchase)<br/>@GlobalTransactional
+    participant TC as Seata 事务协调器(TC)
+    participant RM1 as 订单服务(RM)
+    participant RM2 as 库存服务(RM)
+
+    Client->>App: 调用 purchase(...)
+    App->>TC: 1. 开始全局事务<br/>向TC注册，获取XID
+    App->>RM1: 2. 执行分支事务1<br/>- 创建订单(本地事务)<br/>- 向TC注册分支事务<br/>- XID写入undo_log
+    App->>RM2: 3. 执行分支事务2<br/>- 扣减库存(本地事务)<br/>- 向TC注册分支事务<br/>- XID写入undo_log
+    App->>TC: 4. 提交/回滚？<br/>根据所有分支状态决定
+    TC->>RM1: 5. 下发决议<br/>(commit/rollback)
+    TC->>RM2: 5. 下发决议<br/>(commit/rollback)
+    RM1->>TC: 6. 上报结果
+    RM2->>TC: 6. 上报结果
+    TC->>App: 7. 返回全局事务结果
+    App->>Client: 返回调用结果
+```
+
+**首先，TM会告诉TC全局事务开始了，由各个事务分支向TC汇报事务的状态，是成功还是回滚。如果有一个事务分支汇报回滚，则之前提交的事务都会回滚，回滚的依赖于Seata中的Magic表，用于记录提交之前的版本和数据。**
+
+**AT（2PC）模式并不适合于高并发场景**，原因在于：**AT模式的实现是通过加锁实现的**，那么并发环境下就会导致导致整个线程变成串行化执行，那么并发效率就太低下了
+
+
+
+step1 在每个微服务数据库里创建一个叫做undo_log（回滚日志表）的表
+
+```sql
+CREATE TABLE `undo_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `branch_id` bigint(20) NOT NULL,
+  `xid` varchar(100) NOT NULL,
+  `context` varchar(128) NOT NULL,
+  `rollback_info` longblob NOT NULL,
+  `log_status` int(11) NOT NULL,
+  `log_created` datetime NOT NULL,
+  `log_modified` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_undo_log` (`xid`,`branch_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+```
+
+Step2  注意这里不要用localhost本机，而是docker的host.docker.internal
+
+容器外部访问是localhost，而容器内部访问host.docker.internal
+
+```shell
+docker pull seataio/seata-server:1.8.0
+docker run -d --name seata-server \
+  --restart=unless-stopped \
+  -p 8091:8091 \
+  -p 7091:7091 \
+  -e SEATA_CONFIG_NAME=file:/seata-server/resources/registry \
+  -e STORE_MODE=file \
+  -e registry.type=nacos \
+  -e registry.nacos.serverAddr=host.docker.internal:8848 \
+  -e registry.nacos.namespace=public \
+  -e registry.nacos.cluster=default \
+  -e config.type=nacos \
+  -e config.nacos.serverAddr=host.docker.internal:8848 \
+  -e config.nacos.namespace=public \
+  -e config.nacos.cluster=default \
+  seataio/seata-server:1.8.0
+```
+
+step3
+
+配置类和pom所有相关服务都要添加
+
+```xml
+<!-- Seata -->
+<dependency>
+    <groupId>io.seata</groupId>
+    <artifactId>seata-spring-boot-starter</artifactId>
+    <version>1.8.0</version> <!-- 确保与Seata Server版本一致 -->
+</dependency>
+```
+
+```java
+@Configuration
+public class SeataConfig {
+    @Autowired
+    DataSourceProperties dataSourceProperties;
+
+    @Bean
+    public DataSource dataSource(DataSourceProperties dataSourceProperties){
+        //得到原来的数据源
+        HikariDataSource dataSource = dataSourceProperties.initializeDataSourceBuilder().type(HikariDataSource.class).build();
+        if (StringUtils.hasText(dataSourceProperties.getName())){
+            dataSource.setPoolName(dataSourceProperties.getName());
+        }
+        //创建Seata的数据源，把老数据源传入进行包装
+        return new DataSourceProxy(dataSource);
+    }
+}
+```
+
+step4
+
+- `@GlobalTransactional` 通常只加在**事务发起方**的方法上。
+- 事务参与者（Ware, Product服务）不需要此注解，Seata 的代理会自动帮他们注册分支事务。
+- 确保你的业务方法会抛出异常，Seata 才能感知到失败并进行回滚。
+
+```java
+// @Transactional(isolation = Isolation.READ_COMMITTED) 设置事务的隔离级别
+// @Transactional(propagation = Propagation.REQUIRED)   设置事务的传播级别
+@Transactional(rollbackFor = Exception.class)
+// @GlobalTransactional(rollbackFor = Exception.class)
+```
+
+step5
+
+```yml
+seata:
+  enabled: true
+  tx-service-group: my_test_tx_group  # 事务组名，可自定义
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server    # SeataServer注册的服务名
+      server-addr: 127.0.0.1:8848  # Nacos地址
+      group: DEFAULT_GROUP        # 【重要】通常为DEFAULT_GROUP
+      cluster: default            # 集群名
+  config:
+    type: nacos
+    nacos:
+      server-addr: 127.0.0.1:8848
+      group: SEATA_GROUP          # 配置存储的分组
+  service:
+    vgroup-mapping:
+      my_test_tx_group: default   # 将事务组映射到default集群
+```
+
+### 总结
+
+- **刚性事务**：追求强一致性（CP）。事务的执行是同步的、阻塞的，要求所有参与者立即达成一致状态（要么都成功，要么都失败）。**Seata AT模式** 就属于刚性事务，它通过全局锁保证数据强一致。
+- **柔性事务**：追求最终一致性（AP）。允许系统在某个时刻存在中间状态（不一致），但通过一些补偿措施，最终所有数据都会达到一致。**MQ最终一致性方案** 就属于柔性事务。
+
+高并发不要2PC(AT)，注意，这里XA是标准2PC，globaltransactional是AT！
+
+下订单解锁库存是属于高并发的，选择柔性事务：可靠消息+最终一致性方案。因为这种方案引入了消息队列，哪怕任务执行失败，只需要向队列中发送一个失败消息即可，并不怎么影响并发下的其他下单请求的执行。其具体实现使用了消息队列中的延时队列（TTL+死信进行实现），因为我们订单有过期时间（一般半小时），过了过期时间还不支付就会取消订单。即未付款订单，超过一定时间后，系统自动取消订单并解锁库存；
+
+# 超卖
+
+因此在项目中我采用了基于Redis的原子操作进行预检库存来解决超卖问题，方案如下：
+
+首先判断缓存是否存在该秒杀商品
+
+判断缓存中的秒杀商品库存是否大于0
+
+使用Redis进行预减库存`redisTemplate.opsForValue().increment(key, -1);`这个方法对应Redis的INCR命令，它会返回命令执行后的结果。
+
+> **即使是在分布式Redis集群中，每个独立的Master节点（即每个分片）仍然是单线程处理命令的**，所以这个是原子操作，串行的
+
+对返回结果进行判断是否大于0。大于0则将MySQL库存扣减消息放入消息队列，让MQ进行MySQL与Redis的数据同步，减少响应时间。如果小于0，表示超卖了，需要回滚Redis数据，增加第三步扣减的Redis库存数据。
+
+原子操作就是INCR命令会原子的执行数据运算与结果返回这两步操作。
+
+但是这里我们因为使用到了Redis来操作商品库存，因此需要保证Redis和MySQL的商品库存的数据一致性。方案有提前缓存秒杀商品数据以及在用户访问量不高的时候进行数据同步，也可以通过定时任务检查redis和mysql的数据一致性。同时因为使用到了Redis预减库存，我们还要保证Redis的高可用，这里用到了Redis哨兵集群。
+
+该方法涉及到的优化思路如下：
+
+通过使用Redis缓存数据库减少了MySQL数据库的访问并且实现预减库存避免线程安全问题；通过Rabbitmq消息队列实现异步下单提高下单请求响应速度优化了用户体验；
+
 # 秒杀
 
-# 熔断限流
+限流+异步+缓存(页面静态化)+独立部署
+
+
+
+# Sentinel服务流控、熔断和降级
 
 # 推荐系统
 
-# 监控系统
-
 # 链路追踪
+
+#### sleuth
+
+- 自动生成和传递**Trace ID**（全局唯一）和**Span ID**（单个服务内的操作单元）。
+- 与日志系统（如Logback、Log4j）集成，方便日志关联。
+- 支持与Zipkin、Jaeger等追踪系统对接
+
+```yml
+spring:
+  sleuth:
+    sampler:
+      probability: 1.0  # 采样率（1.0表示100%采集）
+```
+
+#### Zipkin
+
+- 接收Sleuth或其他客户端上报的追踪数据。
+- 提供可视化界面展示**服务依赖关系**、**调用耗时**、**异常路径**等。
+- 支持多种存储后端（如内存、Elasticsearch、MySQL）。
+
+1. Sleuth生成追踪数据 → 2. 通过HTTP/Kafka上报到Zipkin Server → 3. Zipkin存储并展示数据
 
 # LLM搜索
 
 # 加密算法
+
+MD5 就是任意输入长度转成128位二进制，就是32位16进制
 
 ### HS256 对称加密
 
@@ -3839,6 +5037,99 @@ SHA256(secret + message)
 把24位2进制变为4组6位的ASCII码
 
 # 问题
+
+### RedisConfig
+
+```java
+@Configuration
+public class RedisConfig {
+    @Bean
+    public CacheManager cacheManager(LettuceConnectionFactory connectionFactory) {
+
+        //定义序列化器
+        GenericJackson2JsonRedisSerializer genericJackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer();
+        StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+
+
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+                // 配置序列化
+                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(stringRedisSerializer))
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(genericJackson2JsonRedisSerializer));
+
+        return RedisCacheManager.builder(connectionFactory).cacheDefaults(config).build();
+    }
+}
+```
+
+```java
+@Configuration
+public class RedisConfig {
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(redisConnectionFactory);
+
+        // JSON序列化配置
+        Jackson2JsonRedisSerializer jsonRedisSerializer=new Jackson2JsonRedisSerializer(Object.class);
+        ObjectMapper objectMapper=new ObjectMapper();
+        objectMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        objectMapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+        jsonRedisSerializer.setObjectMapper(objectMapper);
+
+        // String的序列化
+        StringRedisSerializer stringRedisSerializer=new StringRedisSerializer();
+
+        //key和hash的key都采用String的序列化方式
+        template.setKeySerializer(stringRedisSerializer);
+        template.setHashKeySerializer(stringRedisSerializer);
+
+        //value和hash的value都采用jackson的序列化方式
+        template.setValueSerializer(jsonRedisSerializer);
+        template.setHashValueSerializer(jsonRedisSerializer);
+
+        template.afterPropertiesSet();
+
+        return template;
+    }
+}
+```
+
+这里setKeySerializer和setValueSerializer就是
+
+**普通 value 和 hash value 的区别**：
+
+- `value` 对应 Redis 的 String 类型（简单键值对）
+- `hashValue` 对应 Redis 的 Hash 类型中的字段值
+
+```java
+redisTemplate.opsForValue().set("user:1", userObject);
+// 序列化：
+// key → String序列化
+// value → JSON序列化
+
+redisTemplate.opsForHash().put("userMap", "user1", userObject);
+// 序列化：
+// hashKey("userMap") → String序列化
+// hashField("user1") → String序列化
+// hashValue(userObject) → JSON序列化
+```
+
+Spring 对缓存操作的**高层抽象接口**，通过注解（如 `@Cacheable`）**隐式**操作 Redis，开发者无需直接接触 Redis 的 API
+
+```java
+@Cacheable(value = "users", key = "#id")  // 自动通过 CacheManager 操作 Redis
+public User getUser(Long id) {
+    return userRepository.findById(id);
+}
+```
+
+Spring 提供的**低级 API**，需要**显式调用** Redis 命令（如 `set`/`get`/`hset`），灵活性更高。
+
+```java
+// 手动通过 RedisTemplate 操作 Redis
+redisTemplate.opsForValue().set("user:" + id, user);
+User cachedUser = (User) redisTemplate.opsForValue().get("user:" + id);
+```
 
 extends RuntimeException，需要继承，而不是implements
 
