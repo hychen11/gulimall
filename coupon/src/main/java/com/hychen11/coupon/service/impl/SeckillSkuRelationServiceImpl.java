@@ -25,10 +25,10 @@ public class SeckillSkuRelationServiceImpl extends ServiceImpl<SeckillSkuRelatio
         LambdaQueryWrapper<SeckillSkuRelationEntity> wrapper = new LambdaQueryWrapper<>();
         String key = (String) params.get("key");
         String sessionId = (String) params.get("promotionSessionId");
-        if (!StringUtils.isBlank(sessionId)) {
+        if (!StringUtils.isEmpty(sessionId)) {
             wrapper.eq(SeckillSkuRelationEntity::getPromotionSessionId, sessionId);
         }
-        if (!StringUtils.isBlank(key)) {
+        if (!StringUtils.isEmpty(key)) {
             wrapper.like(SeckillSkuRelationEntity::getId, key).or().like(SeckillSkuRelationEntity::getPromotionId, key);
         }
 

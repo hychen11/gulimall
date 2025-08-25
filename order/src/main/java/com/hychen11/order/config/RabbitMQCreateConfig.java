@@ -55,4 +55,30 @@ public class RabbitMQCreateConfig {
                 , "order-event-exchange", "order.release.order", null);
     }
 
+    /**
+     * 订单关闭直接和库存释放进行绑定
+     *
+     * @return
+     */
+    @Bean
+    public Binding OrderReleaseOtherBinding() {
+        return new Binding("stock.release.stock.queue", Binding.DestinationType.QUEUE
+                , "order-event-exchange", "order.release.other.#", null);
+    }
+
+    /**
+     * 秒杀消息队列
+     *
+     * @return
+     */
+    @Bean
+    public Queue orderSeckillOrderQueue() {
+        return new Queue("order.seckill.order.queue", true, false, false, null);
+    }
+
+    @Bean
+    public Binding orderSeckillOrderBinding() {
+        return new Binding("order.seckill.order.queue", Binding.DestinationType.QUEUE
+                , "order-event-exchange", "order.seckill.order", null);
+    }
 }

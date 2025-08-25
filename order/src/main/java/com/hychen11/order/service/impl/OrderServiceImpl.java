@@ -7,6 +7,7 @@ import com.hychen11.common.constant.OrderConstant;
 import com.hychen11.common.exception.NoStockException;
 import com.hychen11.common.to.MemberTo;
 import com.hychen11.common.to.OrderTo;
+import com.hychen11.common.to.mq.SeckillOrderTo;
 import com.hychen11.common.utils.R;
 import com.hychen11.order.dao.PaymentInfoDao;
 import com.hychen11.order.entity.OrderItemEntity;
@@ -18,7 +19,6 @@ import com.hychen11.order.feign.ProductFeignService;
 import com.hychen11.order.feign.WareFeignService;
 import com.hychen11.order.vo.*;
 import com.hychen11.order.to.OrderCreateTo;
-import io.seata.spring.annotation.GlobalTransactional;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +53,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
+//import io.seata.spring.annotation.GlobalTransactional;
 
 @Service("orderService")
 public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> implements OrderService {
@@ -177,7 +178,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
 //        case 2: "锁失败";
 //        case 3: "金额对比失败";
 //        case 4: "验证令牌为空";
-    @GlobalTransactional
+//    @GlobalTransactional
     @Transactional
     @Override
     public SubmitOrderResVo submitOrder(OrderSubmitVo orderSubmitVo) {
@@ -481,5 +482,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderDao, OrderEntity> impleme
             return "success";
         }
         return "false";
+    }
+
+    @Override
+    public void createSeckillOrder(SeckillOrderTo seckillOrderTo) {
+        //TODO 保存订单信息
+        OrderEntity orderEntity = new OrderEntity();
+        orderEntity.setOrderSn(seckillOrderTo.getOrderSn());
+        orderEntity.setMemberId(seckillOrderTo.getMemberId());
+
+        orderEntity.setStatus(OrderStatusEnum.CREATE_NEW.getCode());
+        BigDecimal multiply = seckillOrderTo.getSeckillPrice().multiply(new BigDecimal("" + seckillOrderTo.getNum()));
+        orderEntity.setPayAmount(multiply);
+        this.save(orderEntity);
+        // TODO 保存订单项信息
+        OrderItemEntity orderItemEntity = new OrderItemEntity();
+        orderItemEntity.setOrderSn(seckillOrderTo.getOrderSn());
+        orderItemEntity.setRealAmount(multiply);
+        orderItemEntity.setSkuQuantity(seckillOrderTo.getNum());
+        // TODO 获取当前SKU的详细信息进行设置
+        orderItemService.save(orderItemEntity);
     }
 }

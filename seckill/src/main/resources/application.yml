@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: seckill
+  cloud:
+    nacos:
+      config:
+        server-addr: localhost:8848
+      discovery:
+        server-addr: localhost:8848
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+  session:
+    store-type: redis
+  redis:
+    host: localhost
+    port: 6380
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    publisher-confirm-type: correlated  # 启用 confirm 回调
+    publisher-returns: true             # 启用 return 回调
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual        # 启用手动 ack
+
+server:
+  port: 14000
+
+logging:
+  level:
+    com.hychen11: debug
+
+thread:
+  max-size: 200
+  core-size: 20
+  keep-alive-time: 10

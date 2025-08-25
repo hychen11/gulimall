@@ -75,3 +75,15 @@ thread:
   core-size: 20
   max-size: 200
   keep-alive-time: 10
+
+
+alipay:
+  app-id: XXX
+  merchant_private_key: XXX
+  alipay-public-key: XXX
+  gateway-url: XXX
+  notify-url: XXX
+  return-url: XXX
+  charset: utf-8
+  sign-type: RSA2
+  time-out: 30m
